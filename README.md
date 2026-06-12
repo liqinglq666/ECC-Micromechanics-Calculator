@@ -32,35 +32,35 @@ $$
 J_{tip} = \frac{K_m^2}{E_m} \quad [\text{J/m}^2]
 $$
 
-*注：几何修正函数 $F(a_0/d)$ 基于 Gross-Srawley 方程进行无量纲化处理。*
+> 注：几何修正函数 $F(a_0/d)$ 基于 Gross-Srawley 方程进行无量纲化处理。
 
 ### 3. Fiber Bridging Energy (纤维桥接互补能)
-Complementary Energy ($J'_b$) 是决定多缝开裂 (Multiple Cracking) 的终极动力储备。通过对 $\sigma-\delta$ 曲线的峰值左侧区间应用 Simpson 法则进行数值积分获取：
+Complementary Energy ($J_b^{\prime}$) 是决定多缝开裂 (Multiple Cracking) 的终极动力储备。通过对 $\sigma-\delta$ 曲线的峰值左侧区间应用 Simpson 法则进行数值积分获取：
 
 $$
-J'_b = \sigma_0 \delta_0 - \int_{0}^{\delta_0} \sigma(\delta) \,d\delta \quad [\text{J/m}^2]
+J_b^{\prime} = \sigma_0 \delta_0 - \int_{0}^{\delta_0} \sigma(\delta) \, \mathrm{d}\delta \quad [\text{J/m}^2]
 $$
 
 ### 4. PSH Criteria (伪应变硬化双准则)
 要实现稳态的应变硬化行为，材料必须同时满足强度 (Strength) 与能量 (Energy) 双重边界条件：
 
-* **Strength Criterion (激活新裂缝)**: 
-
+- **Strength Criterion (激活新裂缝)**: 
+  
   $$
   PSH_{strength} = \frac{\sigma_0}{\sigma_{fc}} \ge 1.3
   $$
 
-* **Energy Criterion (维持稳态扩展)**: 
-
+- **Energy Criterion (维持稳态扩展)**: 
+  
   $$
-  PSH_{energy} = \frac{J'_b}{J_{tip}} \ge 2.7
+  PSH_{energy} = \frac{J_b^{\prime}}{J_{tip}} \ge 2.7
   $$
 
 ### 5. Theoretical Curve Simulation (纯理论 $\sigma-\delta$ 曲线预测)
 宏观桥接应力 $\sigma(\delta)$ 由单根纤维的非线性拔出力 $P(\delta, L_e, \theta)$ 经过 Double-integral 叠加而成：
 
 $$
-\sigma(\delta) = \frac{8 V_f}{\pi d_f^2 L_f} \int_{0}^{L_f/2} \int_{0}^{\pi/2} P(\delta, L_e, \theta) \sin(\theta) \,d\theta \,dL_e
+\sigma(\delta) = \frac{8 V_f}{\pi d_f^2 L_f} \int_{0}^{L_f/2} \int_{0}^{\pi/2} P(\delta, L_e, \theta) \sin(\theta) \, \mathrm{d}\theta \, \mathrm{d}L_e
 $$
 
 单纤维本构方程 (包含滑移硬化与摩擦放大系数)：
@@ -69,17 +69,18 @@ $$
 P(\delta, L_e, \theta) = \pi d_f \tau_0 (L_e - \delta) \left(1 + \beta \frac{\delta}{d_f}\right) e^{f \theta}
 $$
 
-*(引擎内部包含了严苛的 Fiber Rupture 截断校验：$P \le \frac{\pi d_f^2}{4}\sigma_{fu}$)*
+> 引擎内部包含了严苛的 Fiber Rupture 截断校验：$P \le \frac{\pi d_f^2}{4}\sigma_{fu}$
 
 ### 6. Multi-Fiber Constitutive Extensions
-* **PVA Fibers (化学键模型)**: 引入化学剥离位移界限 $\delta_d$：
 
+- **PVA Fibers (化学键模型)**: 引入化学剥离位移界限 $\delta_d$：
+  
   $$
   \delta_d = \sqrt{\frac{G_d E_f A_f}{\pi d_f \tau_0^2}}
   $$
 
-* **Steel Fibers (端钩锚固模型)**: 
-
+- **Steel Fibers (端钩锚固模型)**: 
+  
   $$
   P_{hook}(\delta) = P_{h0} \left(1 - \frac{\delta}{\delta_{hook}}\right) \quad (\text{if } \delta < \delta_{hook})
   $$
@@ -87,7 +88,7 @@ $$
 ---
 
 ## 🚀 Core Features
-* **Numba JIT Acceleration**: 核心积分运算实时编译，速度提升 10-50 倍。
-* **Asynchronous Engine**: 纯异步计算流，确保 UI 零阻塞。
-* **Publication-Ready Visualization**: 生成顶刊级的高对比度矢量图。
-* **Traceable Data Export**: 支持多标签页的科研数据溯源导出。
+- **Numba JIT Acceleration**: 核心积分运算实时编译，速度提升 10-50 倍。
+- **Asynchronous Engine**: 纯异步计算流，确保 UI 零阻塞。
+- **Publication-Ready Visualization**: 生成顶刊级的高对比度矢量图。
+- **Traceable Data Export**: 支持多标签页的科研数据溯源导出。
