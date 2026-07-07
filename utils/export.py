@@ -26,10 +26,17 @@ from models.project import ProjectModel, SeriesEntry
 _log = logging.getLogger(__name__)
 
 _SIM_PARAM_FIELDS: list[tuple[str, str]] = [
-    ("sim_V_f",        "V_f (vol. fraction)"),
-    ("sim_beta",       "β (slip-hardening)"),
+    ("sim_fiber_type", "Fiber Type"),
+    ("sim_V_f", "V_f (vol. fraction)"),
+    ("sim_L_f", "L_f (mm)"),
+    ("sim_E_f", "E_f (GPa)"),
+    ("sim_sigma_fu", "sigma_fu (MPa)"),
+    ("sim_G_d", "G_d (J/m^2)"),
+    ("sim_beta", "beta (slip-hardening)"),
     ("sim_f_snubbing", "f_snubbing"),
-    ("sim_sigma_fu",   "σ_fu (MPa)"),
+    ("sim_n_delta_points", "Curve Points"),
+    ("sim_P_anchor_max", "P_anchor_max (N)"),
+    ("sim_delta_hook", "delta_hook (mm)"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -51,14 +58,14 @@ def build_summary_df(model: ProjectModel) -> pd.DataFrame:
                 "Series Name":       p.name,
                 "Variable Name":     model.variable_name,
                 "Variable Value":    round(p.variable_value, 3),
-                "τ₀ (MPa)":          round(r.tau0, 3),
-                "Eₘ (GPa)":          round(p.e_m, 3),
-                "Kₘ (MPa·m½)":       round(r.km, 3),
-                "σ_fc (MPa)":        round(p.sigma_fc, 3),
-                "J_tip (J/m²)":      round(r.j_tip, 3),
-                "σ₀ (MPa)":          round(r.sigma0, 3),
-                "δ₀ (mm)":           round(r.delta0, 3),
-                "J_b′ (J/m²)":       round(r.jb_prime, 3),
+                "tau0 (MPa)":        round(r.tau0, 3),
+                "E_m (GPa)":         round(p.e_m, 3),
+                "K_m (MPa*m^0.5)":   round(r.km, 3),
+                "sigma_fc (MPa)":    round(p.sigma_fc, 3),
+                "J_tip (J/m^2)":     round(r.j_tip, 3),
+                "sigma0 (MPa)":      round(r.sigma0, 3),
+                "delta0 (mm)":       round(r.delta0, 3),
+                "J_b' (J/m^2)":      round(r.jb_prime, 3),
                 "PSH Strength":      round(r.psh_strength, 3),
                 "PSH Energy":        round(r.psh_energy, 3),
             }
@@ -68,9 +75,9 @@ def build_summary_df(model: ProjectModel) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "Series Name", "Variable Name", "Variable Value",
-                "τ₀ (MPa)", "Eₘ (GPa)", "Kₘ (MPa·m½)",
-                "σ_fc (MPa)", "J_tip (J/m²)", "σ₀ (MPa)",
-                "δ₀ (mm)", "J_b′ (J/m²)", "PSH Strength", "PSH Energy",
+                "tau0 (MPa)", "E_m (GPa)", "K_m (MPa*m^0.5)",
+                "sigma_fc (MPa)", "J_tip (J/m^2)", "sigma0 (MPa)",
+                "delta0 (mm)", "J_b' (J/m^2)", "PSH Strength", "PSH Energy",
             ]
         )
 
@@ -88,8 +95,8 @@ def build_sigma_delta_df(model: ProjectModel) -> pd.DataFrame:
         name = entry.params.name
         pair = pd.DataFrame(
             {
-                f"{name}_δ (mm)":  df["delta"].reset_index(drop=True),
-                f"{name}_σ (MPa)": df["sigma"].reset_index(drop=True),
+                f"{name}_delta (mm)": df["delta"].reset_index(drop=True),
+                f"{name}_sigma (MPa)": df["sigma"].reset_index(drop=True),
             }
         )
         column_pairs.append(pair)
@@ -105,11 +112,10 @@ def build_settings_log_df(model: ProjectModel) -> pd.DataFrame:
 
     for entry in model:
         p = entry.params
-        data_source = (
-            "Imported CSV"
-            if p.sigma_delta_path is not None
-            else "Theoretical Simulation"
-        )
+        data_source = {
+            "csv": "Imported CSV",
+            "simulation": "Theoretical Simulation",
+        }.get(p.sigma_delta_source, "None")
 
         row: dict = {
             "Series Name":    p.name,
@@ -122,8 +128,8 @@ def build_settings_log_df(model: ProjectModel) -> pd.DataFrame:
             "Width b (mm)":   p.b,
             "Depth d (mm)":   p.d,
             "Notch a0 (mm)":  p.a0,
-            "Eₘ (GPa)":       p.e_m,
-            "σ_fc (MPa)":     p.sigma_fc,
+            "E_m (GPa)":      p.e_m,
+            "sigma_fc (MPa)": p.sigma_fc,
         }
 
         for attr, col in _SIM_PARAM_FIELDS:
@@ -146,7 +152,7 @@ def build_settings_log_df(model: ProjectModel) -> pd.DataFrame:
                 "Series Name", "Data Source",
                 "P_peak (N)", "d_f (mm)", "L_e (mm)", "P_max (N)",
                 "Span S (mm)", "Width b (mm)", "Depth d (mm)", "Notch a0 (mm)",
-                "Eₘ (GPa)", "σ_fc (MPa)",
+                "E_m (GPa)", "sigma_fc (MPa)",
                 *sim_cols,
             ]
         )

@@ -160,10 +160,7 @@ class InterfaceComparisonCanvas(_BaseCanvas):
         x = np.arange(len(x_labels))
         bar_width = 0.5
 
-        p_peak_values = [
-            np.pi * p.d_f * r.tau0 * (p.sim_L_f / 2.0)
-            for r, p in zip(results, params_list)
-        ]
+        p_peak_values = [p.p_peak for p in params_list]
         tau0_values = [r.tau0 for r in results]
 
         ax1.bar(

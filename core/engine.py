@@ -198,8 +198,19 @@ def calc_jb_prime(
     Returns: (sigma0 [MPa], delta0 [mm], jb_prime [J/m^2])
     Unit: MPa*mm * 1000 = J/m^2
     """
+    if len(delta) != len(sigma):
+        raise ValueError(
+            "delta and sigma arrays must have the same length; "
+            f"got {len(delta)} and {len(sigma)}."
+        )
     if len(delta) < 2:
         raise ValueError("sigma-delta curve needs at least 2 data points.")
+    if not (np.isfinite(delta).all() and np.isfinite(sigma).all()):
+        raise ValueError("sigma-delta curve must contain only finite values.")
+    if np.any(delta < 0.0) or np.any(sigma < 0.0):
+        raise ValueError("sigma-delta curve cannot contain negative values.")
+    if np.any(np.diff(delta) <= 0.0):
+        raise ValueError("delta values must be strictly increasing.")
 
     peak_idx = int(np.argmax(sigma))
     sigma0 = float(sigma[peak_idx])

@@ -113,12 +113,12 @@ def load_sigma_delta_csv(path: Path) -> pd.DataFrame:
 _RESULT_COLUMNS: list[str] = [
     "Series",
     "Variable Value",
-    "σ₀ (MPa)",
-    "σ_fc (MPa)",
+    "sigma0 (MPa)",
+    "sigma_fc (MPa)",
     "PSH Strength",
-    "Kₘ (MPa·m½)",
-    "J_tip (J/m²)",
-    "J_b′ (J/m²)",
+    "K_m (MPa*m^0.5)",
+    "J_tip (J/m^2)",
+    "J_b' (J/m^2)",
     "PSH Energy",
 ]
 
@@ -135,17 +135,17 @@ def results_to_dataframe(results: list[AnalysisResult]) -> pd.DataFrame:
         {
             "Series": r.series_name,
             "Variable Value": r.variable_value,
-            "σ₀ (MPa)": round(r.sigma0, 4),
+            "sigma0 (MPa)": round(r.sigma0, 4),
             # BUG-FIX: replaced `r.psh_strength and r.sigma0 / r.psh_strength`
             # (Python and-shortcut that returns int 0 on falsy psh_strength)
             # with an explicit guard that produces NaN on zero.
-            "σ_fc (MPa)": round(
+            "sigma_fc (MPa)": round(
                 r.sigma0 / r.psh_strength if r.psh_strength else float("nan"), 4
             ),
             "PSH Strength": round(r.psh_strength, 4),
-            "Kₘ (MPa·m½)": round(r.km, 4),
-            "J_tip (J/m²)": round(r.j_tip, 4),
-            "J_b′ (J/m²)": round(r.jb_prime, 4),
+            "K_m (MPa*m^0.5)": round(r.km, 4),
+            "J_tip (J/m^2)": round(r.j_tip, 4),
+            "J_b' (J/m^2)": round(r.jb_prime, 4),
             "PSH Energy": round(r.psh_energy, 4),
         }
         for r in results

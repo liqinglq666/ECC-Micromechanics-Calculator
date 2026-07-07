@@ -758,6 +758,8 @@ class MainWindow(QMainWindow):
         self._sb_beta_pva.setValue(p.sim_beta)
         self._sb_f_snubbing.setValue(p.sim_f_snubbing)
         self._sb_n_points.setValue(p.sim_n_delta_points)
+        self._sb_P_anchor.setValue(p.sim_P_anchor_max)
+        self._sb_delta_hook.setValue(p.sim_delta_hook)
 
         for i in range(self._cmb_fiber_type.count()):
             if self._cmb_fiber_type.itemData(i) == p.sim_fiber_type:
@@ -793,6 +795,8 @@ class MainWindow(QMainWindow):
         )
         p.sim_f_snubbing = self._sb_f_snubbing.value()
         p.sim_n_delta_points = self._sb_n_points.value()
+        p.sim_P_anchor_max = self._sb_P_anchor.value()
+        p.sim_delta_hook = self._sb_delta_hook.value()
 
         self._model.get_entry(index).result = None
 
