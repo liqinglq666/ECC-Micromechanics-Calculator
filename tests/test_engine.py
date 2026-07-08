@@ -104,7 +104,6 @@ def test_run_full_analysis_rejects_source_mismatch() -> None:
     df.attrs["source"] = "simulation"
 
     params = _valid_params(df)
-    params.sigma_delta_source = "csv"
 
     with pytest.raises(ValueError, match="was generated from 'simulation'"):
         run_full_analysis(params)
