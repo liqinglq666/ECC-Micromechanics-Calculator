@@ -60,7 +60,7 @@ $$
 J_{\text{tip}} = \frac{K_m^2}{E/(1-\nu^2)} \quad \text{plane strain}
 $$
 
-默认采用 `plane_stress`，泊松比默认 `ν = 0.20`。
+默认采用 `plane_stress`，泊松比默认 `ν = 0.20`。当前 GUI 仍采用默认值；导出文件会记录 fracture condition 和 Poisson ratio，便于后续扩展界面输入。
 
 ---
 
