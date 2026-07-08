@@ -48,8 +48,6 @@ class CsvLoaderWorker(QThread):
 
     Emits `loaded` with (series_index, cleaned_df, resolved_path) on success,
     or `error` with (series_index, human-readable message) on failure.
-    The path is forwarded through the signal so the slot never needs to
-    touch this worker's internal state after completion.
     """
 
     loaded: Signal = Signal(int, object, object)  # (int, pd.DataFrame, Path)
@@ -85,8 +83,6 @@ class BatchAnalysisWorker(QThread):
 
     def __init__(self, model: ProjectModel) -> None:
         super().__init__()
-        # Snapshot params to avoid threading data races.
-        # Filter to series that already have sigma-delta data loaded.
         self._params_snapshot: list[tuple[int, SeriesParams]] = [
             (i, copy.copy(entry.params))
             for i, entry in enumerate(model)
@@ -101,25 +97,18 @@ class BatchAnalysisWorker(QThread):
                 self.series_done.emit(index, result)
             except ValueError as exc:
                 self.error.emit(index, str(exc))
-            # progress.emit is intentionally unconditional: even when a series
-            # errors out the progress bar should advance so the UI never stalls.
             self.progress.emit(current, total)
         self.finished.emit()
 
 
 class SimulationWorker(QThread):
     """
-    Generate a theoretical σ-δ bridging curve for one series via the
-    Victor C. Li double-integral micromechanics model.
+    Generate a theoretical σ-δ bridging curve for one series via a simplified
+    micromechanics double-integral model.
 
-    Emits per-point `progress` so the UI progress bar updates smoothly.
-    On success emits `finished(series_index, df)` where df is drop-in
-    compatible with the CSV import DataFrame (columns: delta, sigma).
-
-    NOTE: τ₀ is derived from AnalysisResult.tau0 and must be computed
-    before constructing this worker. Passing a params whose p_peak or l_e
-    is zero will raise ValueError at construction time so the UI can surface
-    a clear error message before spawning the thread.
+    On success emits `finished(series_index, df)` where df is drop-in compatible
+    with the CSV import DataFrame (columns: delta, sigma).  The DataFrame attrs
+    carry provenance metadata used by core.engine to reject stale curves.
     """
 
     progress: Signal = Signal(int, int)     # (current_point, total_points)
@@ -130,24 +119,22 @@ class SimulationWorker(QThread):
         super().__init__()
         self._series_index = series_index
 
-        # Compute τ₀ from pullout test params at snapshot time (main thread).
-        # Raise immediately if inputs are degenerate so the caller gets a
-        # clear error rather than a silently nonsensical τ₀.
         denom = math.pi * params.d_f * params.l_e
         if denom <= 0.0:
             raise ValueError(
                 f"Cannot compute τ₀: d_f={params.d_f!r} and l_e={params.l_e!r} "
                 "must both be positive non-zero values."
             )
-        self._tau_0: float = params.p_peak / denom
+        if params.p_peak <= 0.0:
+            raise ValueError(f"Cannot compute τ₀: P_peak must be positive; got {params.p_peak!r}.")
 
-        # Shallow-copy the full params struct rather than snapshotting fields
-        # individually — avoids drift when SeriesParams gains new sim_* fields.
+        self._tau_0: float = params.p_peak / denom
         self._params: SeriesParams = copy.copy(params)
+        self._simulation_signature = self._params.simulation_signature()
 
     def run(self) -> None:
         try:
-            fiber_type = FiberType[self._params.sim_fiber_type]  # str → enum
+            fiber_type = FiberType[self._params.sim_fiber_type]
 
             common = CommonFiberParams(
                 V_f=self._params.sim_V_f,
@@ -190,6 +177,8 @@ class SimulationWorker(QThread):
                 pullout_model,
                 progress_callback=lambda cur, tot: self.progress.emit(cur, tot),
             )
+            df.attrs["source"] = "simulation"
+            df.attrs["simulation_signature"] = self._simulation_signature
             self.finished.emit(self._series_index, df)
 
         except KeyError:
@@ -201,6 +190,4 @@ class SimulationWorker(QThread):
         except ValueError as exc:
             self.error.emit(self._series_index, str(exc))
         except (RuntimeError, ArithmeticError, OverflowError) as exc:
-            # Catch numerical failures from the integration kernel without
-            # swallowing system-level errors (MemoryError, etc.).
             self.error.emit(self._series_index, f"Simulation failed: {exc}")
