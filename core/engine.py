@@ -8,6 +8,7 @@ Unit conventions (enforced throughout):
 """
 from __future__ import annotations
 
+import hashlib
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -41,8 +42,10 @@ class SeriesParams:
     d: float = 0.0             # mm
     a0: float = 0.0            # mm
 
-    # Matrix elastic modulus
+    # Matrix elastic modulus / fracture condition
     e_m: float = 0.0           # GPa
+    fracture_condition: str = "plane_stress"  # "plane_stress" | "plane_strain"
+    poisson_ratio: float = 0.20
 
     # ECC uniaxial tensile test
     sigma_fc: float = 0.0      # MPa  (first-crack composite strength)
@@ -50,11 +53,12 @@ class SeriesParams:
     sigma_delta_path: Optional[Path] = field(default=None, repr=False)
     sigma_delta_df: Optional[pd.DataFrame] = field(default=None, repr=False)
 
-    # σ-δ data provenance — written to export log; never affects engine math
-    sigma_delta_source: str = "none"   # Literal["none", "csv", "simulation"]
+    # σ-δ data provenance — written to export log and validated before math
+    sigma_delta_source: str = "none"   # "none" | "csv" | "simulation"
 
     # ── Theoretical simulation parameters ──────────────────────────────
-    # Only interpreted by SimulationEngine; engine.py math never reads them.
+    # Only interpreted by SimulationEngine; engine.py reads them only to build
+    # a reproducibility signature that prevents stale simulated curves.
     sim_fiber_type: str = "PE"          # "PE" | "PVA" | "STEEL"
     sim_V_f: float = 0.02
     sim_L_f: float = 12.0
@@ -67,6 +71,34 @@ class SeriesParams:
     sim_P_anchor_max: float = 0.0       # N  (Steel only)
     sim_delta_hook: float = 0.5         # mm (Steel only)
 
+    def simulation_signature(self) -> str:
+        """
+        Stable fingerprint for all inputs that affect theoretical σ–δ curves.
+
+        The GUI may keep a simulated DataFrame cached while the user edits
+        parameters.  This signature is stored on DataFrame.attrs at simulation
+        time and checked in run_full_analysis() so stale curves cannot be used
+        silently with new inputs.
+        """
+        parts = [
+            self.sim_fiber_type,
+            self.p_peak,
+            self.d_f,
+            self.l_e,
+            self.sim_V_f,
+            self.sim_L_f,
+            self.sim_E_f,
+            self.sim_sigma_fu,
+            self.sim_G_d,
+            self.sim_beta,
+            self.sim_f_snubbing,
+            self.sim_n_delta_points,
+            self.sim_P_anchor_max,
+            self.sim_delta_hook,
+        ]
+        payload = "|".join(str(x) for x in parts)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
 
 @dataclass
 class AnalysisResult:
@@ -77,7 +109,7 @@ class AnalysisResult:
     # These are the *only* authoritative copies in the codebase; all other
     # modules (e.g. result_table_model.py) must read from here.
     #
-    # Basis: JSCE recommendations + Li & Leung (1992).
+    # Basis: practical ECC/SHCC micromechanics design indices.
     #   PSH_strength >= 1.3  (accounts for material scatter)
     #   PSH_energy   >= 2.7  (accounts for size effects)
     # ------------------------------------------------------------------
@@ -111,6 +143,8 @@ class AnalysisResult:
 
 def calc_tau0(p_peak: float, d_f: float, l_e: float) -> float:
     """tau_0 = P_peak / (pi * d_f * L_e)  ->  MPa  (N / mm^2 = MPa)"""
+    if p_peak <= 0.0:
+        raise ValueError(f"P_peak must be positive; got {p_peak}")
     if d_f <= 0.0 or l_e <= 0.0:
         raise ValueError(f"d_f and l_e must be positive; got d_f={d_f}, l_e={l_e}")
     return p_peak / (math.pi * d_f * l_e)
@@ -153,8 +187,12 @@ def calc_km(p_max: float, span: float, b: float, d: float, a0: float) -> float:
     K_m = (P_max * S) / (b * d^1.5) * f(a0/d)
 
     Input: N, mm  ->  Output: MPa*m^0.5
-    Conversion: MPa*mm^-0.5 / sqrt(1000) = MPa*m^0.5
+    Conversion: MPa*mm^0.5 / sqrt(1000) = MPa*m^0.5
     """
+    if p_max <= 0.0:
+        raise ValueError(f"P_max must be positive; got {p_max}")
+    if span <= 0.0:
+        raise ValueError(f"Span S must be positive; got {span}")
     if b <= 0.0 or d <= 0.0:
         raise ValueError("Specimen dimensions b and d must be positive.")
     alpha = a0 / d
@@ -162,26 +200,62 @@ def calc_km(p_max: float, span: float, b: float, d: float, a0: float) -> float:
     return km_mm / math.sqrt(1_000.0)
 
 
-def calc_j_tip(km: float, e_m_gpa: float) -> float:
+def calc_j_tip(
+    km: float,
+    e_m_gpa: float,
+    fracture_condition: str = "plane_stress",
+    poisson_ratio: float = 0.20,
+) -> float:
     """
-    J_tip = K_m^2 / E_m  ->  J/m^2
+    Crack-tip toughness from K_m.
 
-    Unit derivation:
-        km  [MPa·m^0.5] → km^2 [MPa^2·m]
-        E_m [GPa] × 1000 → [MPa]
-        km^2 / E_m_MPa  =  MPa^2·m / MPa  =  MPa·m
-        1 MPa·m = 1e6 Pa·m = 1e6 N/m^2 · m = 1e6 J/m^2
-        therefore: J_tip [J/m^2] = (km^2 / e_m_mpa) * 1_000_000
+    plane_stress: J_tip = K_m^2 / E
+    plane_strain: J_tip = K_m^2 / E' where E' = E / (1 - nu^2)
+
+    Units:
+        km [MPa·m^0.5], E [GPa] → J/m² after multiplying MPa·m by 1e6.
     """
+    if km <= 0.0:
+        raise ValueError(f"K_m must be positive; got {km}")
     if e_m_gpa <= 0.0:
         raise ValueError(f"E_m must be positive; got {e_m_gpa} GPa")
+
+    condition = fracture_condition.strip().lower()
+    if condition not in {"plane_stress", "plane_strain"}:
+        raise ValueError(
+            "fracture_condition must be 'plane_stress' or 'plane_strain'; "
+            f"got {fracture_condition!r}"
+        )
+
+    if not (0.0 <= poisson_ratio < 0.5):
+        raise ValueError(f"poisson_ratio must be in [0, 0.5); got {poisson_ratio}")
+
     e_m_mpa = e_m_gpa * 1_000.0
-    return (km ** 2 / e_m_mpa) * 1_000_000.0
+    if condition == "plane_strain":
+        e_eff_mpa = e_m_mpa / (1.0 - poisson_ratio ** 2)
+    else:
+        e_eff_mpa = e_m_mpa
+
+    return (km ** 2 / e_eff_mpa) * 1_000_000.0
 
 
 # ---------------------------------------------------------------------------
 # Step 3 — Fibre-bridging complementary energy
 # ---------------------------------------------------------------------------
+
+def _ensure_origin(delta: np.ndarray, sigma: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Ensure numerical integration covers 0 → δ0.
+
+    Imported or simulated curves occasionally start from a small positive crack
+    opening.  Omitting that initial segment overestimates J_b'.  We prepend a
+    conservative origin when the first point is positive.
+    """
+    if delta[0] > 0.0:
+        delta = np.insert(delta, 0, 0.0)
+        sigma = np.insert(sigma, 0, 0.0)
+    return delta, sigma
+
 
 def calc_jb_prime(
     delta: np.ndarray,
@@ -212,6 +286,8 @@ def calc_jb_prime(
     if np.any(np.diff(delta) <= 0.0):
         raise ValueError("delta values must be strictly increasing.")
 
+    delta, sigma = _ensure_origin(delta.astype(float, copy=False), sigma.astype(float, copy=False))
+
     peak_idx = int(np.argmax(sigma))
     sigma0 = float(sigma[peak_idx])
     delta0 = float(delta[peak_idx])
@@ -224,7 +300,7 @@ def calc_jb_prime(
     else:
         # NOTE: Simpson requires >= 3 points; trapezoid used as graceful
         # degradation when peak appears in the first two samples.
-        area = float(np.trapz(s_up, x=d_up))
+        area = float(np.trapezoid(s_up, x=d_up))
 
     jb_prime_mpa_mm = sigma0 * delta0 - area
     return sigma0, delta0, jb_prime_mpa_mm * 1_000.0
@@ -244,11 +320,47 @@ def calc_psh(
     PSH_strength = sigma0 / sigma_fc   (engineering pass: >= 1.3)
     PSH_energy   = J_b' / J_tip        (engineering pass: >= 2.7)
     """
+    if sigma0 <= 0.0:
+        raise ValueError(f"sigma0 must be positive; got {sigma0}")
     if sigma_fc <= 0.0:
         raise ValueError(f"sigma_fc must be positive; got {sigma_fc}")
+    if jb_prime <= 0.0:
+        raise ValueError(f"J_b' must be positive; got {jb_prime}")
     if j_tip <= 0.0:
         raise ValueError(f"J_tip must be positive; got {j_tip}")
     return sigma0 / sigma_fc, jb_prime / j_tip
+
+
+# ---------------------------------------------------------------------------
+# Provenance validation
+# ---------------------------------------------------------------------------
+
+def _validate_sigma_delta_provenance(params: SeriesParams, df: pd.DataFrame) -> None:
+    """Reject stale or mismatched σ–δ data before any physics calculation."""
+    source = params.sigma_delta_source
+    actual_source = df.attrs.get("source")
+
+    if source not in {"csv", "simulation"}:
+        raise ValueError(
+            f"Series '{params.name}' has no active σ–δ source. "
+            "Import a CSV or run theoretical simulation first."
+        )
+
+    if actual_source is not None and actual_source != source:
+        raise ValueError(
+            f"Series '{params.name}' is set to '{source}', but the loaded σ–δ curve "
+            f"was generated from '{actual_source}'. Re-import or re-simulate the curve."
+        )
+
+    if source == "simulation":
+        expected = params.simulation_signature()
+        actual = df.attrs.get("simulation_signature")
+        if actual != expected:
+            raise ValueError(
+                f"Series '{params.name}' has a stale simulated σ–δ curve. "
+                "Simulation parameters changed after the curve was generated. "
+                "Run Simulation again before analysis."
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -263,16 +375,24 @@ def run_full_analysis(params: SeriesParams) -> AnalysisResult:
     """
     if params.sigma_delta_df is None:
         raise ValueError(
-            f"Series '{params.name}' has no sigma-delta data. Import a CSV first."
+            f"Series '{params.name}' has no sigma-delta data. Import a CSV or run simulation first."
         )
 
     df = params.sigma_delta_df
+    _validate_sigma_delta_provenance(params, df)
+
+    missing_cols = [c for c in ("delta", "sigma") if c not in df.columns]
+    if missing_cols:
+        raise ValueError(
+            f"Series '{params.name}' sigma-delta data is missing column(s): {missing_cols}"
+        )
+
     delta_arr = df["delta"].to_numpy(dtype=float)
     sigma_arr = df["sigma"].to_numpy(dtype=float)
 
     tau0 = calc_tau0(params.p_peak, params.d_f, params.l_e)
     km = calc_km(params.p_max, params.span, params.b, params.d, params.a0)
-    j_tip = calc_j_tip(km, params.e_m)
+    j_tip = calc_j_tip(km, params.e_m, params.fracture_condition, params.poisson_ratio)
     sigma0, delta0, jb_prime = calc_jb_prime(delta_arr, sigma_arr)
     psh_strength, psh_energy = calc_psh(sigma0, params.sigma_fc, jb_prime, j_tip)
 
