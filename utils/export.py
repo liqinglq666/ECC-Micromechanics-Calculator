@@ -17,11 +17,10 @@ import numpy as np
 import pandas as pd
 from PySide6.QtCore import QThread, Signal
 
-from openpyxl.styles import Font, Alignment, PatternFill
-from openpyxl.utils import get_column_letter
+from openpyxl.styles import Alignment, Font, PatternFill
 
 from core.engine import AnalysisResult
-from models.project import ProjectModel, SeriesEntry
+from models.project import ProjectModel
 
 _log = logging.getLogger(__name__)
 
@@ -60,6 +59,8 @@ def build_summary_df(model: ProjectModel) -> pd.DataFrame:
                 "Variable Value":    round(p.variable_value, 3),
                 "tau0 (MPa)":        round(r.tau0, 3),
                 "E_m (GPa)":         round(p.e_m, 3),
+                "Fracture Condition": p.fracture_condition,
+                "Poisson Ratio":     round(p.poisson_ratio, 3),
                 "K_m (MPa*m^0.5)":   round(r.km, 3),
                 "sigma_fc (MPa)":    round(p.sigma_fc, 3),
                 "J_tip (J/m^2)":     round(r.j_tip, 3),
@@ -75,9 +76,10 @@ def build_summary_df(model: ProjectModel) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "Series Name", "Variable Name", "Variable Value",
-                "tau0 (MPa)", "E_m (GPa)", "K_m (MPa*m^0.5)",
-                "sigma_fc (MPa)", "J_tip (J/m^2)", "sigma0 (MPa)",
-                "delta0 (mm)", "J_b' (J/m^2)", "PSH Strength", "PSH Energy",
+                "tau0 (MPa)", "E_m (GPa)", "Fracture Condition", "Poisson Ratio",
+                "K_m (MPa*m^0.5)", "sigma_fc (MPa)", "J_tip (J/m^2)",
+                "sigma0 (MPa)", "delta0 (mm)", "J_b' (J/m^2)",
+                "PSH Strength", "PSH Energy",
             ]
         )
 
@@ -129,6 +131,8 @@ def build_settings_log_df(model: ProjectModel) -> pd.DataFrame:
             "Depth d (mm)":   p.d,
             "Notch a0 (mm)":  p.a0,
             "E_m (GPa)":      p.e_m,
+            "Fracture Condition": p.fracture_condition,
+            "Poisson Ratio":  p.poisson_ratio,
             "sigma_fc (MPa)": p.sigma_fc,
         }
 
@@ -152,7 +156,7 @@ def build_settings_log_df(model: ProjectModel) -> pd.DataFrame:
                 "Series Name", "Data Source",
                 "P_peak (N)", "d_f (mm)", "L_e (mm)", "P_max (N)",
                 "Span S (mm)", "Width b (mm)", "Depth d (mm)", "Notch a0 (mm)",
-                "E_m (GPa)", "sigma_fc (MPa)",
+                "E_m (GPa)", "Fracture Condition", "Poisson Ratio", "sigma_fc (MPa)",
                 *sim_cols,
             ]
         )
