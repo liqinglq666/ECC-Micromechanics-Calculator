@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ecc-micromechanics"
-version = "0.2.0"
+version = "0.2.1"
 description = "ECC micromechanics parameter calculator and PSH criterion evaluator"
 readme = "README.md"
-license = { text = "MIT" }
-# 【修改】将对 Python 的版本要求放宽至 3.10
+license = { text = "Proprietary" }
 requires-python = ">=3.10"
 dependencies = [
     "PySide6>=6.6",
@@ -20,6 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+accel = ["numba>=0.59"]
 dev = ["pytest>=8", "ruff>=0.4", "mypy>=1.9", "pandas-stubs"]
 
 [project.scripts]
@@ -27,13 +27,13 @@ ecc-calc = "main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["core*", "models*", "ui*", "utils*"]
 
 # ---------------------------------------------------------------------------
 # Ruff — linting + formatting
 # ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
-# 【修改】将 ruff 的目标解析版本改为 3.10
 target-version = "py310"
 
 [tool.ruff.lint]
@@ -52,7 +52,6 @@ ignore = [
 # Mypy
 # ---------------------------------------------------------------------------
 [tool.mypy]
-# 【修改】将 mypy 的类型推导版本改为 3.10
 python_version = "3.10"
 strict = true
 implicit_reexport = false
