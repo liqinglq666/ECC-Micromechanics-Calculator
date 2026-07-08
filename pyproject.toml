@@ -25,6 +25,9 @@ dev = ["pytest>=8", "ruff>=0.4", "mypy>=1.9", "pandas-stubs"]
 [project.scripts]
 ecc-calc = "main:main"
 
+[tool.setuptools]
+py-modules = ["main"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["core*", "models*", "ui*", "utils*"]
