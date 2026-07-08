@@ -90,8 +90,17 @@ def _valid_params(df: pd.DataFrame) -> SeriesParams:
     )
 
 
+def _positive_energy_curve() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "delta": [0.0, 0.1, 0.2, 0.3],
+            "sigma": [0.0, 2.0, 4.0, 3.0],
+        }
+    )
+
+
 def test_run_full_analysis_rejects_source_mismatch() -> None:
-    df = pd.DataFrame({"delta": [0.0, 0.1, 0.2], "sigma": [0.0, 2.0, 4.0]})
+    df = _positive_energy_curve()
     df.attrs["source"] = "simulation"
 
     params = _valid_params(df)
@@ -102,7 +111,7 @@ def test_run_full_analysis_rejects_source_mismatch() -> None:
 
 
 def test_run_full_analysis_rejects_stale_simulation_signature() -> None:
-    df = pd.DataFrame({"delta": [0.0, 0.1, 0.2], "sigma": [0.0, 2.0, 4.0]})
+    df = _positive_energy_curve()
     df.attrs["source"] = "simulation"
     df.attrs["simulation_signature"] = "old-signature"
 
