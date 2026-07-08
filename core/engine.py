@@ -300,7 +300,7 @@ def calc_jb_prime(
     else:
         # NOTE: Simpson requires >= 3 points; trapezoid used as graceful
         # degradation when peak appears in the first two samples.
-        area = float(np.trapezoid(s_up, x=d_up))
+        area = float(np.trapz(s_up, x=d_up))
 
     jb_prime_mpa_mm = sigma0 * delta0 - area
     return sigma0, delta0, jb_prime_mpa_mm * 1_000.0
