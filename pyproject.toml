@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ecc-micromechanics"
+version = "0.2.1"
+description = "ECC micromechanics parameter calculator and PSH criterion evaluator"
+readme = "README.md"
+license = { text = "Proprietary" }
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6>=6.6",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "scipy>=1.11",
+    "openpyxl>=3.1",
+]
+
+[project.optional-dependencies]
+accel = ["numba>=0.59"]
+dev = ["pytest>=8", "ruff>=0.4", "mypy>=1.9", "pandas-stubs"]
+
+[project.scripts]
+ecc-calc = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "models*", "ui*", "utils*"]
+
+# ---------------------------------------------------------------------------
+# Ruff — linting + formatting
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "N", "ANN"]
+ignore = [
+    "ANN101",  # self 不需要标注
+    "ANN102",  # cls 不需要标注
+    "ANN201",  # private 函数返回类型可省略
+    "ANN202",  # dunder 方法返回类型可省略
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
+
+# ---------------------------------------------------------------------------
+# Mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+strict = true
+implicit_reexport = false
+
+[[tool.mypy.overrides]]
+module = ["scipy.*", "matplotlib.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"
