@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
@@ -161,3 +163,32 @@ def test_analysis_preflight_reports_missing_and_stale_curves(window: MainWindow)
 
     assert any(missing.params.name in problem and "no active" in problem for problem in problems)
     assert any(stale.params.name in problem and "stale" in problem for problem in problems)
+
+
+def test_csv_result_is_discarded_if_user_switched_to_simulation(window: MainWindow) -> None:
+    window._on_add_series()
+    entry = window._current_entry()
+    assert entry is not None
+    entry.params.sigma_delta_mode = "simulation"
+    incoming = _curve("csv")
+
+    window._on_csv_loaded(entry.series_id, incoming, Path("late.csv"))
+
+    assert entry.params.sigma_delta_mode == "simulation"
+    assert entry.params.sigma_delta_source == "none"
+    assert entry.params.sigma_delta_df is None
+
+
+def test_simulation_result_is_discarded_if_user_switched_to_csv(window: MainWindow) -> None:
+    window._on_add_series()
+    entry = window._current_entry()
+    assert entry is not None
+    entry.params.sigma_delta_mode = "csv"
+    incoming = _curve("simulation")
+    incoming.attrs["simulation_signature"] = entry.params.simulation_signature()
+
+    window._on_sim_result(entry.series_id, incoming)
+
+    assert entry.params.sigma_delta_mode == "csv"
+    assert entry.params.sigma_delta_source == "none"
+    assert entry.params.sigma_delta_df is None
