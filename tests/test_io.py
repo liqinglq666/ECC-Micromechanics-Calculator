@@ -37,7 +37,9 @@ def test_load_sigma_delta_csv_rejects_normalized_duplicate_columns(tmp_path: Pat
         load_sigma_delta_csv(path)
 
 
-def test_load_sigma_delta_csv_rejects_non_monotonic_delta_instead_of_sorting(tmp_path: Path) -> None:
+def test_load_sigma_delta_csv_rejects_non_monotonic_delta_instead_of_sorting(
+    tmp_path: Path,
+) -> None:
     path = tmp_path / "unsorted.csv"
     pd.DataFrame({"delta": [0.1, 0.0], "sigma": [2.0, 0.0]}).to_csv(path, index=False)
 
