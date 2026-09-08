@@ -72,20 +72,22 @@ class SimulationWorker(QThread):
     def __init__(self, series_index: int, params: SeriesParams) -> None:
         super().__init__()
         self._series_index = series_index
-
-        denom = math.pi * params.d_f * params.l_e
-        if denom <= 0.0:
-            raise ValueError(
-                f"Cannot compute tau_0: d_f={params.d_f!r} and l_e={params.l_e!r} "
-                "must both be positive non-zero values."
-            )
-        if params.p_peak <= 0.0:
-            raise ValueError(
-                f"Cannot compute tau_0: P_peak must be positive; got {params.p_peak!r}."
-            )
-
-        self._tau_0 = params.p_peak / denom
         self._params = copy.copy(params)
+
+        if params.sim_tau0_override > 0.0:
+            self._tau_0 = params.sim_tau0_override
+        else:
+            denom = math.pi * params.d_f * params.l_e
+            if denom <= 0.0:
+                raise ValueError(
+                    f"Cannot compute tau_0: d_f={params.d_f!r} and l_e={params.l_e!r} "
+                    "must both be positive non-zero values."
+                )
+            if params.p_peak <= 0.0:
+                raise ValueError(
+                    f"Cannot compute tau_0: P_peak must be positive; got {params.p_peak!r}."
+                )
+            self._tau_0 = params.p_peak / denom
         self._simulation_signature = self._params.simulation_signature()
 
     def run(self) -> None:
