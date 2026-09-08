@@ -31,15 +31,22 @@ def simulate_sigma_delta(
     pullout_model: FiberPulloutModel,
     progress_callback=None,
 ) -> pd.DataFrame:
+    """Validation wrapper: detect physics bugs; never mutate the curve to hide them."""
     if common.V_f <= 0.0:
         raise ValueError("V_f must be greater than 0 for bridging simulation.")
 
     df = _simulate_sigma_delta(common, pullout_model, progress_callback=progress_callback)
+    delta = df["delta"].to_numpy(dtype=float)
     sigma = df["sigma"].to_numpy(dtype=float)
-    if not np.isfinite(sigma).all() or np.any(sigma < 0.0):
-        raise ValueError("Simulated bridging stress contains invalid values.")
 
-    # 桥接曲线必须过原点，别让简化拔出模型偷带 preload。
-    if len(df):
-        df.loc[df.index[0], "sigma"] = 0.0
+    if not (np.isfinite(delta).all() and np.isfinite(sigma).all()):
+        raise ValueError("Simulated bridging curve contains non-finite values.")
+    if np.any(delta < 0.0) or np.any(sigma < 0.0):
+        raise ValueError("Simulated bridging curve contains negative values.")
+    if len(df) == 0 or not np.isclose(delta[0], 0.0, atol=1e-12):
+        raise ValueError("Simulated bridging curve must start at delta=0.")
+    if not np.isclose(sigma[0], 0.0, atol=1e-10):
+        raise ValueError(
+            "Simulated bridging stress must be zero at delta=0; fix the pullout model instead of forcing the first point."
+        )
     return df

@@ -76,11 +76,11 @@ class SimulationWorker(QThread):
         denom = math.pi * params.d_f * params.l_e
         if denom <= 0.0:
             raise ValueError(
-                f"Cannot compute τ₀: d_f={params.d_f!r} and l_e={params.l_e!r} "
+                f"Cannot compute tau_0: d_f={params.d_f!r} and l_e={params.l_e!r} "
                 "must both be positive non-zero values."
             )
         if params.p_peak <= 0.0:
-            raise ValueError(f"Cannot compute τ₀: P_peak must be positive; got {params.p_peak!r}.")
+            raise ValueError(f"Cannot compute tau_0: P_peak must be positive; got {params.p_peak!r}.")
 
         self._tau_0 = params.p_peak / denom
         self._params = copy.copy(params)
@@ -98,13 +98,10 @@ class SimulationWorker(QThread):
                 tau_0=self._tau_0,
                 f_snubbing=self._params.sim_f_snubbing,
                 n_delta_points=self._params.sim_n_delta_points,
+                E_m=self._params.e_m,
             )
 
-            pe_params = (
-                PEFiberParams(beta=self._params.sim_beta)
-                if fiber_type is FiberType.PE
-                else None
-            )
+            pe_params = PEFiberParams(beta=self._params.sim_beta) if fiber_type is FiberType.PE else None
             pva_params = (
                 PVAFiberParams(G_d=self._params.sim_G_d, beta=self._params.sim_beta)
                 if fiber_type is FiberType.PVA
