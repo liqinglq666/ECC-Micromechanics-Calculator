@@ -222,7 +222,9 @@ def calc_jb_prime(delta: np.ndarray, sigma: np.ndarray) -> tuple[float, float, f
     if len(d_up) >= 3:
         area = float(simpson(s_up, x=d_up))
     else:
-        area = float(np.trapz(s_up, x=d_up))
+        # NumPy 2.x removed the deprecated np.trapz alias; trapezoid is the
+        # supported equivalent and preserves the original two-point behavior.
+        area = float(np.trapezoid(s_up, x=d_up))
 
     jb_prime_mpa_mm = sigma0 * delta0 - area
     return sigma0, delta0, jb_prime_mpa_mm * 1000.0
