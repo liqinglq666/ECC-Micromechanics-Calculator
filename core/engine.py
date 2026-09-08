@@ -56,6 +56,8 @@ class SeriesParams:
     sim_G_d: float = 3.0                # J/m^2 (PVA only)
     sim_beta: float = 0.0               # PE default: no assumed slip-hardening
     sim_f_snubbing: float = 0.20
+    sim_f_strength_reduction: float = 0.0
+    sim_orientation: str = "3d"         # "3d" isotropic | "2d" planar
     sim_n_delta_points: int = 300
     sim_P_anchor_max: float = 0.0       # N (Steel only)
     sim_delta_hook: float = 0.5         # mm (Steel only)
@@ -75,6 +77,8 @@ class SeriesParams:
             self.sim_G_d,
             self.sim_beta,
             self.sim_f_snubbing,
+            self.sim_f_strength_reduction,
+            self.sim_orientation,
             self.sim_n_delta_points,
             self.sim_P_anchor_max,
             self.sim_delta_hook,
