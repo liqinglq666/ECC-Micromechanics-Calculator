@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import pandas as pd
 
@@ -13,9 +15,7 @@ from core.simulation import (
     build_pullout_model,
     simulate_sigma_at_delta,
 )
-from core.simulation import (
-    simulate_sigma_delta as _simulate_sigma_delta,
-)
+from core.simulation import simulate_sigma_delta as _simulate_sigma_delta
 
 __all__ = [
     "CommonFiberParams",
@@ -33,7 +33,7 @@ __all__ = [
 def simulate_sigma_delta(
     common: CommonFiberParams,
     pullout_model: FiberPulloutModel,
-    progress_callback=None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> pd.DataFrame:
     """Validation wrapper: detect physics bugs; never mutate the curve."""
     if common.V_f <= 0.0:
