@@ -1,0 +1,81 @@
+name: Copyright Real UI Screenshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/copyright-screenshots.yml"
+      - "scripts/capture_copyright_screenshots.py"
+
+permissions:
+  contents: read
+
+jobs:
+  capture-real-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      QT_QPA_PLATFORM: xcb
+      QT_SCALE_FACTOR: "1"
+      MPLBACKEND: QtAgg
+      ECC_SCREENSHOT_DIR: copyright_screenshots
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Linux GUI runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xvfb \
+            libegl1 \
+            libgl1 \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            libxcb-xinerama0 \
+            libxcb-keysyms1 \
+            libxcb-image0 \
+            libxcb-render-util0 \
+            fonts-dejavu-core \
+            fonts-noto-cjk
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Launch real PySide6 UI and capture screenshots
+        run: |
+          mkdir -p copyright_screenshots
+          xvfb-run -a -s "-screen 0 1920x1080x24" \
+            python scripts/capture_copyright_screenshots.py
+
+      - name: Verify generated files
+        run: |
+          ls -lh copyright_screenshots
+          test -f copyright_screenshots/01_startup_main_window.png
+          test -f copyright_screenshots/02_pe_ecc_parameter_input.png
+          test -f copyright_screenshots/03_single_series_results.png
+          test -f copyright_screenshots/04_data_summary.png
+          test -f copyright_screenshots/05_comparative_analytics.png
+          test -f copyright_screenshots/ECC_MC_real_run_results.xlsx
+
+      - name: Upload real UI screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: ECC-MC-real-ui-screenshots
+          path: copyright_screenshots/
+          if-no-files-found: error
+          retention-days: 30
