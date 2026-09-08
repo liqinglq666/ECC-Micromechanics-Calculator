@@ -7,6 +7,7 @@ on:
     paths:
       - ".github/workflows/copyright-screenshots.yml"
       - "scripts/capture_copyright_screenshots.py"
+      - "core/engine.py"
 
 permissions:
   contents: read
