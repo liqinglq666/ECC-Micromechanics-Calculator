@@ -50,6 +50,17 @@ def test_calc_jb_prime_integrates_to_peak() -> None:
     assert jb_prime == pytest.approx(400.0)
 
 
+def test_calc_jb_prime_two_point_curve_uses_compatible_trapezoid() -> None:
+    delta = np.array([0.0, 0.1])
+    sigma = np.array([0.0, 2.0])
+
+    sigma0, delta0, jb_prime = calc_jb_prime(delta, sigma)
+
+    assert sigma0 == pytest.approx(2.0)
+    assert delta0 == pytest.approx(0.1)
+    assert jb_prime == pytest.approx(100.0)
+
+
 def test_calc_jb_prime_prepends_origin_when_imported_curve_starts_positive() -> None:
     delta = np.array([0.1, 0.2, 0.3])
     sigma = np.array([2.0, 4.0, 3.0])
