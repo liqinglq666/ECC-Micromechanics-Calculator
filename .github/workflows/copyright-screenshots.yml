@@ -3,7 +3,9 @@ name: Copyright Real UI Screenshots
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "refactor/**"
     paths:
       - ".github/workflows/copyright-screenshots.yml"
       - "scripts/capture_copyright_screenshots.py"
