@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from core.engine import AnalysisResult
+from ui import main_window as main_window_module
 from ui.main_window import MainWindow
 
 
@@ -57,6 +58,10 @@ def test_form_edits_persist_when_switching_series(window: MainWindow, qtbot) -> 
     assert window._sb_d_f.value() == pytest.approx(0.039)
 
 
+def test_vf_control_excludes_physically_invalid_unity(window: MainWindow) -> None:
+    assert window._sb_V_f.maximum() == pytest.approx(0.9999)
+
+
 def test_editing_simulation_parameter_invalidates_old_curve(window: MainWindow) -> None:
     window._on_add_series()
     entry = window._current_entry()
@@ -94,6 +99,46 @@ def test_mode_switch_clears_incompatible_curve_provenance(window: MainWindow) ->
     assert entry.params.sigma_delta_source == "none"
     assert entry.params.sigma_delta_df is None
     assert entry.result is None
+
+
+def test_csv_replacement_invalidates_old_curve_before_background_load(
+    window: MainWindow,
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    window._on_add_series()
+    entry = window._current_entry()
+    assert entry is not None
+    entry.params.sigma_delta_mode = "csv"
+    entry.params.sigma_delta_source = "csv"
+    entry.params.sigma_delta_df = _curve("csv")
+    entry.params.sigma_delta_path = Path("old.csv")
+    entry.result = _result(entry.params.name)
+
+    replacement = tmp_path / "replacement.csv"
+    pd.DataFrame({"delta": [0.0, 0.1], "sigma": [0.0, 1.0]}).to_csv(
+        replacement, index=False
+    )
+    monkeypatch.setattr(
+        main_window_module.QFileDialog,
+        "getOpenFileName",
+        staticmethod(lambda *args, **kwargs: (str(replacement), "CSV files (*.csv)")),
+    )
+    monkeypatch.setattr(main_window_module.CsvLoaderWorker, "start", lambda self: None)
+
+    window._on_import_csv()
+
+    assert entry.params.sigma_delta_df is None
+    assert entry.params.sigma_delta_path is None
+    assert entry.params.sigma_delta_source == "none"
+    assert entry.result is None
+    assert entry.series_id in window._csv_workers
+    assert not window._btn_run.isEnabled()
+
+    worker = window._csv_workers[entry.series_id]
+    window._cleanup_csv_worker(entry.series_id, worker)
+    assert window._btn_run.isEnabled()
+    worker.deleteLater()
 
 
 def test_simulation_result_is_routed_by_stable_id_after_index_shift(window: MainWindow) -> None:

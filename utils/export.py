@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -83,17 +84,24 @@ def build_summary_df(model: ProjectModel) -> pd.DataFrame:
 
 
 def build_sigma_delta_df(model: ProjectModel) -> pd.DataFrame:
+    curve_entries = [
+        entry
+        for entry in model
+        if entry.params.sigma_delta_df is not None and not entry.params.sigma_delta_df.empty
+    ]
+    name_counts = Counter(entry.params.name for entry in curve_entries)
+
     column_pairs: list[pd.DataFrame] = []
-    for entry in model:
+    for entry in curve_entries:
         df = entry.params.sigma_delta_df
-        if df is None or df.empty:
-            continue
+        assert df is not None
         name = entry.params.name
+        label = name if name_counts[name] == 1 else f"{name} [{entry.series_id[:8]}]"
         column_pairs.append(
             pd.DataFrame(
                 {
-                    f"{name}_delta (mm)": df["delta"].reset_index(drop=True),
-                    f"{name}_sigma (MPa)": df["sigma"].reset_index(drop=True),
+                    f"{label}_delta (mm)": df["delta"].reset_index(drop=True),
+                    f"{label}_sigma (MPa)": df["sigma"].reset_index(drop=True),
                 }
             )
         )

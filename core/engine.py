@@ -14,7 +14,7 @@ from typing import ClassVar
 
 import numpy as np
 import pandas as pd
-from scipy.integrate import simpson
+from scipy.integrate import simpson, trapezoid
 
 
 @dataclass
@@ -73,7 +73,7 @@ class SeriesParams:
 
         When tau0 is explicitly overridden, pullout peak load and embedment
         length no longer affect the simulation and are therefore excluded from
-        the fingerprint.  Fibre diameter remains included because the bridging
+        the fingerprint. Fibre diameter remains included because the bridging
         law itself uses d_f.
         """
         tau_source = (
@@ -237,7 +237,9 @@ def calc_jb_prime(delta: np.ndarray, sigma: np.ndarray) -> tuple[float, float, f
     if len(d_up) >= 3:
         area = float(simpson(s_up, x=d_up))
     else:
-        area = float(np.trapezoid(s_up, x=d_up))
+        # scipy.integrate.trapezoid is available throughout the declared
+        # SciPy>=1.11 range and keeps this path compatible with NumPy 1.26.
+        area = float(trapezoid(s_up, x=d_up))
 
     jb_prime_mpa_mm = sigma0 * delta0 - area
     return sigma0, delta0, jb_prime_mpa_mm * 1000.0

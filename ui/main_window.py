@@ -278,7 +278,7 @@ class MainWindow(QMainWindow):
         sim_layout.addLayout(fiber_form)
 
         shared_form = QFormLayout()
-        self._sb_V_f = _make_dsb(0.0, 1.0, 4, "", 0.001)
+        self._sb_V_f = _make_dsb(0.0, 0.9999, 4, "", 0.001)
         self._sb_V_f.setValue(0.02)
         self._sb_L_f = _make_dsb(0.0, 200.0, 3, "mm", 0.1)
         self._sb_L_f.setValue(12.0)
@@ -765,6 +765,15 @@ class MainWindow(QMainWindow):
         if not path_str:
             return
 
+        # The moment a replacement file is selected, the previous curve and
+        # result are no longer valid for this series. Clearing them before the
+        # worker starts prevents analysis from racing against a background CSV
+        # load and accidentally reusing stale scientific data.
+        self._model.clear_curve(entry.series_id)
+        if entry.series_id == self._current_series_id:
+            self._lbl_csv_path.setText(f"Loading {Path(path_str).name}…")
+        self._refresh_all_views()
+
         worker = CsvLoaderWorker(entry.series_id, Path(path_str))
         worker.loaded.connect(self._on_csv_loaded)
         worker.failed.connect(self._on_csv_error)
@@ -773,6 +782,7 @@ class MainWindow(QMainWindow):
             lambda sid=entry.series_id, w=worker: self._cleanup_csv_worker(sid, w)
         )
         self._csv_workers[entry.series_id] = worker
+        self._btn_run.setEnabled(False)
         worker.start()
         self._status_bar.showMessage(f"Loading {Path(path_str).name}…")
 
@@ -793,12 +803,15 @@ class MainWindow(QMainWindow):
     @Slot(str, str)
     def _on_csv_error(self, series_id: str, message: str) -> None:
         if self._model.find_entry(series_id) is not None:
+            if series_id == self._current_series_id:
+                self._lbl_csv_path.setText("No file loaded")
             QMessageBox.critical(self, "CSV Load Error", message)
         self._status_bar.showMessage("CSV load failed.")
 
     def _cleanup_csv_worker(self, series_id: str, worker: CsvLoaderWorker) -> None:
         if self._csv_workers.get(series_id) is worker:
             self._csv_workers.pop(series_id, None)
+        self._btn_run.setEnabled(not self._analysis_busy and not self._csv_workers)
 
     # ------------------------------------------------------------------
     # Simulation
@@ -935,6 +948,13 @@ class MainWindow(QMainWindow):
         if self._model.is_empty():
             QMessageBox.information(self, "No Series", "Add at least one series before running.")
             return
+        if self._csv_workers:
+            QMessageBox.information(
+                self,
+                "CSV Load In Progress",
+                "Wait for all σ–δ CSV files to finish loading before running batch analysis.",
+            )
+            return
         entry = self._current_entry()
         if entry is not None:
             self._write_form_to_params(entry.params)
@@ -1020,7 +1040,7 @@ class MainWindow(QMainWindow):
 
     def _set_analysis_busy(self, busy: bool) -> None:
         self._analysis_busy = busy
-        self._btn_run.setEnabled(not busy)
+        self._btn_run.setEnabled(not busy and not self._csv_workers)
         self._btn_add.setEnabled(not busy)
         self._btn_remove.setEnabled(not busy)
         self._param_box.setEnabled(not busy and self._current_series_id is not None)

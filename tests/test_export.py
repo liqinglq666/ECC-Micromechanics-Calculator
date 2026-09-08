@@ -4,7 +4,7 @@ import pandas as pd
 
 from core.engine import SeriesParams
 from models.project import ProjectModel
-from utils.export import build_settings_log_df
+from utils.export import build_settings_log_df, build_sigma_delta_df
 
 
 def test_settings_log_contains_full_simulation_provenance() -> None:
@@ -36,3 +36,24 @@ def test_settings_log_contains_full_simulation_provenance() -> None:
     assert row["tau0 override (MPa)"] == 1.31
     assert row["f' strength reduction"] == 0.33
     assert row["Fiber Orientation"] == "2d"
+
+
+def test_sigma_delta_export_disambiguates_duplicate_series_names() -> None:
+    model = ProjectModel()
+    first = SeriesParams(name="Mix-A")
+    first.sigma_delta_df = pd.DataFrame({"delta": [0.0, 0.1], "sigma": [0.0, 1.0]})
+    second = SeriesParams(name="Mix-A")
+    second.sigma_delta_df = pd.DataFrame({"delta": [0.0, 0.2], "sigma": [0.0, 2.0]})
+
+    model.add_series(first, series_id="11111111aaaaaaaa")
+    model.add_series(second, series_id="22222222bbbbbbbb")
+
+    exported = build_sigma_delta_df(model)
+
+    assert list(exported.columns) == [
+        "Mix-A [11111111]_delta (mm)",
+        "Mix-A [11111111]_sigma (MPa)",
+        "Mix-A [22222222]_delta (mm)",
+        "Mix-A [22222222]_sigma (MPa)",
+    ]
+    assert exported.columns.is_unique
