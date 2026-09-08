@@ -18,31 +18,35 @@ from scipy.integrate import simpson
 
 @dataclass
 class SeriesParams:
-    """Raw experimental inputs for one mix-design series."""
+    """Raw experimental and simulation inputs for one mix-design series."""
 
     name: str = ""
     variable_value: float = 0.0
 
     # Single-fibre pullout test
-    p_peak: float = 0.0        # N; PE: peak ~= frictional pullout reference
-    d_f: float = 0.0           # mm
-    l_e: float = 0.0           # mm
+    p_peak: float = 0.0
+    d_f: float = 0.0
+    l_e: float = 0.0
 
     # Matrix fracture - SENB 3-point bending
-    p_max: float = 0.0         # N
-    span: float = 0.0          # mm
-    b: float = 0.0             # mm
-    d: float = 0.0             # mm
-    a0: float = 0.0            # mm
+    p_max: float = 0.0
+    span: float = 0.0
+    b: float = 0.0
+    d: float = 0.0
+    a0: float = 0.0
 
     # Matrix elastic modulus / fracture condition
-    e_m: float = 0.0           # GPa
+    e_m: float = 0.0
     fracture_condition: str = "plane_stress"
     poisson_ratio: float = 0.20
 
     # ECC uniaxial tensile test
-    sigma_fc: float = 0.0      # MPa
+    sigma_fc: float = 0.0
 
+    # Bridging-curve selection and provenance are intentionally distinct.
+    # mode: what the user currently selected in the UI.
+    # source: where the currently loaded curve actually came from.
+    sigma_delta_mode: str = "csv"  # "csv" | "simulation"
     sigma_delta_path: Optional[Path] = field(default=None, repr=False)
     sigma_delta_df: Optional[pd.DataFrame] = field(default=None, repr=False)
     sigma_delta_source: str = "none"  # "none" | "csv" | "simulation"
@@ -51,25 +55,35 @@ class SeriesParams:
     sim_fiber_type: str = "PE"
     sim_V_f: float = 0.02
     sim_L_f: float = 12.0
-    sim_E_f: float = 116.0              # GPa
-    sim_sigma_fu: float = 2600.0        # MPa
-    sim_G_d: float = 3.0                # J/m^2 (PVA only)
-    sim_beta: float = 0.0               # PE default: no assumed slip-hardening
+    sim_E_f: float = 116.0
+    sim_sigma_fu: float = 2600.0
+    sim_G_d: float = 3.0
+    sim_beta: float = 0.0
     sim_f_snubbing: float = 0.20
-    sim_tau0_override: float = 0.0       # MPa; 0 -> derive from pullout test
+    sim_tau0_override: float = 0.0
     sim_f_strength_reduction: float = 0.0
-    sim_orientation: str = "3d"         # "3d" isotropic | "2d" planar
+    sim_orientation: str = "3d"
     sim_n_delta_points: int = 300
-    sim_P_anchor_max: float = 0.0       # N (Steel only)
-    sim_delta_hook: float = 0.5         # mm (Steel only)
+    sim_P_anchor_max: float = 0.0
+    sim_delta_hook: float = 0.5
 
     def simulation_signature(self) -> str:
-        """Stable fingerprint for every input that affects simulated sigma-delta."""
+        """Stable fingerprint of every input that affects simulated sigma-delta.
+
+        When tau0 is explicitly overridden, pullout peak load and embedment
+        length no longer affect the simulation and are therefore excluded from
+        the fingerprint.  Fibre diameter remains included because the bridging
+        law itself uses d_f.
+        """
+        tau_source = (
+            ("override", self.sim_tau0_override)
+            if self.sim_tau0_override > 0.0
+            else ("derived", self.p_peak, self.l_e)
+        )
         parts = [
             self.sim_fiber_type,
-            self.p_peak,
+            tau_source,
             self.d_f,
-            self.l_e,
             self.e_m,
             self.sim_V_f,
             self.sim_L_f,
@@ -78,14 +92,13 @@ class SeriesParams:
             self.sim_G_d,
             self.sim_beta,
             self.sim_f_snubbing,
-            self.sim_tau0_override,
             self.sim_f_strength_reduction,
             self.sim_orientation,
             self.sim_n_delta_points,
             self.sim_P_anchor_max,
             self.sim_delta_hook,
         ]
-        payload = "|".join(str(x) for x in parts)
+        payload = "|".join(str(value) for value in parts)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -189,7 +202,7 @@ def calc_j_tip(
 
 
 def _ensure_origin(delta: np.ndarray, sigma: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Prepend a conservative (0,0) only for imported curves that start at delta>0."""
+    """Prepend a conservative (0,0) only for imported curves starting at delta>0."""
     if delta[0] > 0.0:
         delta = np.insert(delta, 0, 0.0)
         sigma = np.insert(sigma, 0, 0.0)
@@ -222,8 +235,6 @@ def calc_jb_prime(delta: np.ndarray, sigma: np.ndarray) -> tuple[float, float, f
     if len(d_up) >= 3:
         area = float(simpson(s_up, x=d_up))
     else:
-        # NumPy 2.x removed the deprecated np.trapz alias; trapezoid is the
-        # supported equivalent and preserves the original two-point behavior.
         area = float(np.trapezoid(s_up, x=d_up))
 
     jb_prime_mpa_mm = sigma0 * delta0 - area
@@ -282,7 +293,7 @@ def run_full_analysis(params: SeriesParams) -> AnalysisResult:
 
     df = params.sigma_delta_df
     _validate_sigma_delta_provenance(params, df)
-    missing_cols = [c for c in ("delta", "sigma") if c not in df.columns]
+    missing_cols = [column for column in ("delta", "sigma") if column not in df.columns]
     if missing_cols:
         raise ValueError(
             f"Series '{params.name}' sigma-delta data is missing column(s): {missing_cols}"
