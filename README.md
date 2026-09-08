@@ -1,367 +1,743 @@
-# ECC 微观力学计算与桥接模拟平台
+<div align="center">
 
-![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
-![License](https://img.shields.io/badge/license-Proprietary-red)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
-![UI Framework](https://img.shields.io/badge/UI-PySide6-brightgreen)
-![Acceleration](https://img.shields.io/badge/Optional-Numba%20JIT-orange)
+# ECC Micromechanics Calculator
 
-本项目面向 **工程水泥基复合材料（Engineered Cementitious Composites, ECC）** 与 **应变硬化水泥基复合材料（Strain-Hardening Cementitious Composites, SHCC）** 的微观力学设计与计算分析，围绕“纤维—界面—基体—裂缝桥接—伪应变硬化”这一核心链条，构建了一个可追溯、可解释、可扩展的计算平台。
+### Literature-Benchmarked Micromechanics · Fiber Bridging · PSH Evaluation
 
-它并不是单纯把公式做成界面，而是试图将 ECC 的材料设计逻辑转化为一个清晰的计算框架：
+**工程水泥基复合材料（ECC/SHCC）微观力学计算、桥接本构模拟与伪应变硬化判据平台**
 
-> **当纤维类型、界面摩擦、基体断裂韧度与桥接曲线发生变化时，材料是否仍然具备稳定多缝开裂与拉伸应变硬化的微观力学条件？**
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PySide6](https://img.shields.io/badge/UI-PySide6-41CD52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython-6/)
+[![SciPy](https://img.shields.io/badge/Numerics-SciPy%20%7C%20NumPy-8CAAE6)](https://scipy.org/)
+[![Model](https://img.shields.io/badge/Bridging-Yang%202008%20baseline-6A5ACD)](docs/LITERATURE_BENCHMARK.md)
+[![Benchmark](https://img.shields.io/badge/M45%20benchmark-5.97%20MPa%20%40%2072%20μm-2E8B57)](docs/LITERATURE_BENCHMARK.md)
+[![License](https://img.shields.io/badge/License-Proprietary-B22222)](pyproject.toml)
+
+> **From fiber–matrix interface mechanics to macroscopic strain-hardening assessment.**  
+> 将“单纤维拔出 → 基体断裂 → 裂缝桥接 → PSH 双准则”统一到一个可追溯、可验证、可扩展的计算框架中。
+
+</div>
 
 ---
 
-## 1. 研究背景与问题意识
+## 1. Overview · 项目定位
 
-ECC/SHCC 与普通水泥基材料最大的区别，并不是单纯的强度提升，而是在拉伸荷载下能够通过多缝稳定开裂实现显著的变形能力。其关键不在于“裂缝是否出现”，而在于裂缝出现后能否被纤维桥接作用稳定控制，并进一步诱导新的裂缝形成。
+**ECC Micromechanics Calculator** 面向 Engineered Cementitious Composites（ECC）与 Strain-Hardening Cementitious Composites（SHCC）的材料设计、科研分析与微观力学解释。
 
-从微观力学角度看，ECC 的拉伸应变硬化行为至少受以下三类机制共同控制：
+项目关注的不是单个经验指标，而是 ECC 形成稳定多缝开裂所需的跨尺度力学平衡：
 
-1. **纤维—基体界面作用**：界面摩擦应力需要足够传递荷载，但过强的界面作用又可能诱发纤维断裂，削弱拔出耗能能力；
-2. **基体断裂阻力**：基体断裂韧度越高，裂缝扩展所需能量越大，纤维桥接系统需要提供更高的能量储备；
-3. **纤维桥接本构关系**：桥接曲线不仅要有足够高的峰值应力，还要有足够的互补能，以支持稳态裂缝扩展。
-
-因此，本项目将 ECC 设计问题理解为一个跨尺度平衡问题：
+- **Fiber–matrix interface / 纤维–基体界面**：界面摩擦、化学键、滑移硬化与倾角效应如何控制单纤维承载；
+- **Matrix fracture / 基体断裂**：基体断裂韧度与裂尖能量需求如何限制稳态裂缝扩展；
+- **Fiber bridging / 纤维桥接**：单纤维拔出响应如何积分为宏观 `σ–δ` 桥接本构；
+- **Pseudo strain hardening / 伪应变硬化**：强度裕度与能量裕度是否同时满足稳定多缝开裂条件。
 
 ```mermaid
 flowchart LR
-    A[单纤维拔出试验] --> B[界面摩擦应力 τ0]
-    C[基体三点弯曲断裂试验] --> D[基体断裂参数 Km 与 Jtip]
-    E[桥接应力-裂缝张开曲线 σ-δ] --> F[桥接互补能 Jb']
-    B --> G[纤维荷载传递能力]
-    D --> H[裂缝扩展能量需求]
-    F --> I[纤维桥接能量供给]
-    G --> J[PSH 强度准则]
-    H --> K[PSH 能量准则]
+    A[Single-fiber pullout<br/>单纤维拔出] --> B[Interface parameters<br/>τ₀ · Gd · β · f · f′]
+    C[SENB fracture test<br/>基体三点弯曲] --> D[Km]
+    D --> E[Jtip]
+    B --> F[Single-fiber law<br/>P δ,l,θ]
+    F --> G[Orientation integration<br/>2D / 3D random fibers]
+    G --> H[Bridging law<br/>σ-δ]
+    H --> I[σ₀ · δ₀ · Jb′]
+    I --> J[PSH strength]
+    E --> K[PSH energy]
     I --> K
-    J --> L[ECC 多缝开裂潜力评估]
+    J --> L{Strain-hardening<br/>potential?}
     K --> L
+```
+
+### Core philosophy
+
+> ECC 设计不能只看“强度够不够”，也不能只看“耗能够不够”。  
+> **Strength criterion + Energy criterion must be satisfied simultaneously.**
+
+---
+
+## 2. What makes this project different
+
+这个项目并不是“把公式做成 GUI”。当前版本强调四件事：
+
+| Capability | Description | Research value |
+|---|---|---|
+| **Physics-based** | 从界面、断裂到桥接本构的连续计算链 | 避免只做经验回归 |
+| **Traceable** | 模拟参数签名与 `σ–δ` 来源绑定 | 防止参数变了却误用旧曲线 |
+| **Benchmarkable** | 内置 Yang et al. (2008) M45 文献回归测试 | 结果不只与自己比较 |
+| **Dual-mode** | 实验 `σ–δ` 导入 + 理论桥接模拟 | 同时适合正式分析与机理敏感性研究 |
+
+```mermaid
+mindmap
+  root((ECC Micromechanics))
+    Interface
+      tau0
+      Gd
+      beta
+      Snubbing f
+      Strength reduction f-prime
+    Matrix
+      SENB
+      Km
+      Jtip
+    Bridging
+      PE PP
+      PVA
+      Steel
+      2D orientation
+      3D orientation
+      Irreversible rupture
+    PSH
+      Strength margin
+      Energy margin
+      Jb-prime
+    Validation
+      Yang 2008
+      Regression tests
+      Provenance tracking
 ```
 
 ---
 
-## 2. 项目学术定位
+## 3. Scientific workflow · 科学计算链
 
-本项目适用于 ECC/SHCC 微观力学设计、纤维桥接行为分析、基体断裂韧度评价以及配合比参数敏感性研究。它更关注“机制解释”而非单点数值输出，适合用于以下研究场景：
+```mermaid
+flowchart TD
+    A[Input experimental / calibrated parameters] --> B{Bridging source}
 
-- 比较不同胶凝材料体系对基体断裂韧度与 PSH 潜力的影响；
-- 分析 PE、PVA、Steel 等不同纤维体系的桥接能力差异；
-- 探索纤维体积分数、纤维长度、纤维直径和界面摩擦对桥接曲线的影响；
-- 判断高界面粘结是否会带来纤维断裂风险；
-- 解释为什么某些材料具有较高初裂强度，却未必表现出良好拉伸延性；
-- 将单纤维拔出试验、基体断裂试验与宏观拉伸性能建立定量联系。
+    B -->|Experimental mode| C[Import measured σ-δ CSV]
+    B -->|Theoretical mode| D[Build fiber pullout model]
 
-项目的核心思想是：**ECC 的设计不能只看强度，也不能只看韧性，而应同时考察强度裕度与能量裕度。**
+    D --> D1[PE / PP<br/>debonding + frictional sliding]
+    D --> D2[PVA<br/>chemical debond + slip hardening]
+    D --> D3[Hooked steel<br/>simplified friction + anchorage]
+
+    D1 --> E[64-point Gauss-Legendre integration]
+    D2 --> E
+    D3 --> E
+
+    E --> F[Macroscopic σ-δ curve]
+    C --> F
+
+    G[SENB geometry] --> H[Km]
+    H --> I[Jtip]
+
+    F --> J[σ0 / δ0]
+    F --> K[Jb′]
+
+    J --> L[PSH_strength]
+    K --> M[PSH_energy]
+    I --> M
+
+    L --> N[Engineering assessment]
+    M --> N
+```
 
 ---
 
-## 3. 微观力学计算框架
+## 4. Micromechanics formulation
 
-### 3.1 界面摩擦应力
+### 4.1 Interface frictional bond stress
 
-单纤维拔出试验用于估算平均界面摩擦应力：
+对于适合用平均摩擦应力近似的单纤维拔出试验：
 
 $$
-\tau_0=\frac{P_{\text{peak}}}{\pi d_f L_e}
+\tau_0=\frac{P}{\pi d_f L_e}
 $$
 
 其中：
 
-| 符号 | 含义 | 单位 |
-|---|---|---|
-| $P_{\text{peak}}$ | 单纤维拔出峰值荷载 | N |
-| $d_f$ | 纤维直径 | mm |
-| $L_e$ | 有效埋入长度 | mm |
-| $\tau_0$ | 平均界面摩擦应力 | MPa |
+| Symbol | Meaning | Unit |
+|---|---|---:|
+| $P$ | characteristic pullout load | N |
+| $d_f$ | fiber diameter | mm |
+| $L_e$ | embedment length | mm |
+| $\tau_0$ | frictional bond stress | MPa |
 
-在 ECC 微观力学设计中，$\tau_0$ 并不是一个孤立参数。它直接影响纤维在裂缝张开过程中的荷载传递能力，并进一步影响桥接曲线的峰值、上升段形态、纤维拔出耗能与断裂风险。
-
-过低的界面摩擦会导致桥接应力不足，难以激活多缝开裂；过高的界面摩擦则可能使纤维在尚未充分拔出耗能前发生断裂。因此，界面调控本质上是一种“荷载传递能力”与“拔出耗能能力”之间的平衡。
+> 对 **PVA** 或 **hooked steel**，峰值拔出荷载可能同时包含化学键或机械锚固贡献。当前版本支持 `sim_tau0_override`，可直接输入独立标定的 $\tau_0$，避免 double counting。
 
 ---
 
-### 3.2 基体断裂参数
+### 4.2 Matrix fracture toughness
 
-基体断裂阻力通过单边缺口梁（SENB）三点弯曲试验进行估算：
-
-$$
-K_m=\frac{P_{\max}S}{bd^{1.5}}F\left(\frac{a_0}{d}\right)
-$$
-
-其中 $F(a_0/d)$ 为几何修正函数。程序内部将计算结果从：
+基体单边缺口梁（SENB）采用：
 
 $$
-\text{MPa}\cdot\sqrt{\text{mm}}
+K_m=\frac{P_{max}S}{bd^{3/2}}F\left(\frac{a_0}{d}\right)
 $$
 
-转换为：
+程序当前采用 Gross–Srawley / ASTM-style 几何函数，并对其对应的：
 
 $$
-\text{MPa}\cdot\sqrt{\text{m}}
+\frac{S}{d}\approx4
 $$
 
-基体裂尖能量需求可表示为：
+进行显式校验。若试件跨高比与该几何模型不匹配，程序会拒绝直接套用，而不是静默输出一个看似合理的 $K_m$。
+
+裂尖能量需求：
 
 $$
-J_{tip}=\frac{K_m^2}{E}\quad\text{平面应力假设}
+J_{tip}=\frac{K_m^2}{E_m}
 $$
 
-或：
+平面应变条件下：
 
 $$
-J_{tip}=\frac{K_m^2}{E/(1-\nu^2)}\quad\text{平面应变假设}
+E'=\frac{E_m}{1-\nu^2},\qquad
+J_{tip}=\frac{K_m^2}{E'}
 $$
-
-该区分具有重要意义。不同试件厚度、边界条件和断裂解释框架下，平面应力与平面应变会导致不同的裂尖能量需求。当前默认采用平面应力假设，泊松比默认取 $\nu=0.20$。
 
 ---
 
-### 3.3 纤维桥接互补能
+### 4.3 Fiber bridging law
 
-纤维桥接曲线 $\sigma(\delta)$ 描述裂缝张开位移增加时，跨裂缝纤维系统能够提供的桥接应力。程序根据该曲线提取峰值桥接应力 $\sigma_0$ 及其对应裂缝张开位移 $\delta_0$，并计算桥接互补能：
+宏观桥接应力来自大量随机取向纤维的统计积分：
+
+$$
+\sigma(\delta)
+\propto
+\int_0^{\pi/2}\int_0^{L_f/2}
+P(\delta,l,\theta)\,w(\theta)\,dl\,d\theta
+$$
+
+其中 $P(\delta,l,\theta)$ 为单纤维拔出力。
+
+#### 3-D isotropic random fibers
+
+$$
+w_{3D}(\theta)=\sin\theta\cos\theta
+$$
+
+#### 2-D planar random fibers
+
+$$
+w_{2D}(\theta)=\frac{2}{\pi}\cos\theta
+$$
+
+当前数值积分使用 **64-point Gauss–Legendre quadrature**，用于在稳定精度下提高整条 `σ–δ` 曲线扫描效率。
+
+---
+
+### 4.4 Inclination effects
+
+倾角对纤维桥接的影响被拆成两个不同机制：
+
+#### Snubbing amplification
+
+$$
+P(\theta)=P(0)e^{f\theta}
+$$
+
+#### Inclination-dependent tensile strength reduction
+
+$$
+\sigma_{fu}(\theta)=\sigma_{fu}(0)e^{-f'\theta}
+$$
+
+代码中 `f` 与 `f′` 分开输入，避免将“倾角增加拔出阻力”和“倾角降低有效纤维强度”混成同一个经验系数。
+
+---
+
+### 4.5 Irreversible fiber rupture
+
+纤维断裂是 **path-dependent / 路径相关** 的。
+
+程序判断的是：
+
+$$
+\max_{0\le s\le\delta} P(s,l,\theta)
+$$
+
+是否曾超过当前倾角下的纤维承载极限。一旦超过，后续所有更大裂缝开口下该纤维贡献均保持为零。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active
+    Active --> Active: Pmax < Prup
+    Active --> Ruptured: Pmax ≥ Prup
+    Ruptured --> Ruptured: δ increases
+    Ruptured --> [*]
+```
+
+这避免了传统逐点独立计算中可能出现的“纤维已经断裂，后续因为瞬时拔出力下降又重新承载”的非物理现象。
+
+---
+
+## 5. Complementary energy & PSH criteria
+
+从桥接曲线提取峰值：
+
+$$
+(\delta_0,\sigma_0)=\operatorname*{arg\,max}_{\delta}\sigma(\delta)
+$$
+
+桥接互补能：
 
 $$
 J_b'=\sigma_0\delta_0-\int_0^{\delta_0}\sigma(\delta)d\delta
 $$
 
-$J_b'$ 的物理意义是：纤维桥接系统在峰值点之前能够为稳态裂缝扩展提供的有效能量储备。相比单独使用峰值桥接应力，$J_b'$ 更能反映桥接曲线整体形态对裂缝稳定扩展的贡献。
-
-一个材料体系可能具有较高的 $\sigma_0$，但如果桥接曲线上升过陡、耗能不足，仍可能无法满足稳定裂缝扩展所需的能量条件。因此，本项目将 $J_b'$ 作为判断 ECC 应变硬化潜力的核心能量指标。
-
----
-
-### 3.4 伪应变硬化双准则
-
-ECC/SHCC 的多缝开裂能力通常需要同时满足强度准则与能量准则。
-
-#### 强度准则
+### Strength criterion
 
 $$
 PSH_{strength}=\frac{\sigma_0}{\sigma_{fc}}
 $$
 
-其中 $\sigma_{fc}$ 为复合材料初裂强度。该准则用于判断桥接峰值应力是否足以在首条裂缝形成后继续承担荷载，并诱导新的裂缝产生。
-
-#### 能量准则
+### Energy criterion
 
 $$
 PSH_{energy}=\frac{J_b'}{J_{tip}}
 $$
 
-该准则用于判断纤维桥接系统提供的互补能是否足以抵抗基体裂尖扩展所需能量。
+当前工程判据：
 
-| 判据 | 建议阈值 | 微观力学含义 |
+| Criterion | Threshold | Interpretation |
 |---|---:|---|
-| $PSH_{strength}$ | $\geq 1.3$ | 桥接强度相对初裂强度具有足够裕度 |
-| $PSH_{energy}$ | $\geq 2.7$ | 桥接能量相对裂尖能量需求具有足够裕度 |
+| $PSH_{strength}$ | $\ge 1.3$ | 桥接峰值相对初裂强度具有足够强度裕度 |
+| $PSH_{energy}$ | $\ge 2.7$ | 桥接互补能相对裂尖能量需求具有足够裕度 |
 
-强度准则与能量准则必须同时考虑。仅满足强度准则并不意味着裂缝能够稳定扩展；仅满足能量准则也不意味着新裂缝能够被有效激活。二者共同决定 ECC 是否具备稳定多缝开裂潜力。
+```mermaid
+quadrantChart
+    title ECC / SHCC Pseudo-Strain-Hardening Design Space
+    x-axis Low energy margin --> High energy margin
+    y-axis Low strength margin --> High strength margin
+    quadrant-1 Robust PSH candidate
+    quadrant-2 Strength-controlled risk
+    quadrant-3 Non-PSH region
+    quadrant-4 Energy-controlled risk
+```
+
+> `quadrantChart` 用于表达设计空间概念；正式判定仍以实际计算得到的 PSH 数值为准。
 
 ---
 
-## 4. 计算模式
+## 6. Two calculation modes
 
-### 4.1 实验曲线导入模式
+### Mode A — Experimental / calibrated `σ–δ`
 
-该模式适用于正式分析。用户可以导入由实验、反演分析或外部数值模型得到的桥接应力—裂缝张开曲线。
+**推荐用于最终论文定量 PSH 结论。**
 
-CSV 文件格式如下：
+CSV 格式：
 
 ```csv
 delta,sigma
-0.0,0.0
-0.1,2.3
-0.2,4.1
+0.000,0.000
+0.020,1.850
+0.040,3.260
+0.080,5.120
+0.120,5.880
 ```
 
-| 列名 | 含义 | 单位 |
+- `delta`: crack opening, mm
+- `sigma`: bridging stress, MPa
+
+程序会进行：
+
+```text
+CSV ingestion
+  ├─ numeric coercion
+  ├─ NaN / Inf filtering
+  ├─ negative-value rejection
+  ├─ delta sorting
+  ├─ duplicate handling
+  └─ source provenance tagging
+```
+
+### Mode B — Theoretical bridging simulation
+
+用于：
+
+- micromechanics sensitivity analysis；
+- 纤维参数设计；
+- 界面参数影响趋势研究；
+- 缺少直接桥接曲线时的机制性估算。
+
+支持的主要物理参数包括：
+
+```yaml
+fiber:
+  type: PE | PVA | STEEL
+  Vf: volume_fraction
+  Lf: fiber_length_mm
+  df: fiber_diameter_mm
+  Ef: fiber_modulus_GPa
+  sigma_fu: tensile_strength_MPa
+
+interface:
+  tau0: frictional_bond_MPa
+  Gd: chemical_debond_energy_J_m2
+  beta: slip_hardening_coefficient
+  f: snubbing_coefficient
+  f_prime: inclination_strength_reduction
+
+orientation:
+  mode: 2d | 3d
+
+numerics:
+  integration: Gauss-Legendre
+  quadrature_order: 64
+```
+
+---
+
+## 7. Literature benchmark · Yang et al. (2008)
+
+当前理论桥接模型不是只通过“自己生成的数据”测试，而是加入了公开文献 benchmark。
+
+### M45 PVA-ECC benchmark
+
+Yang, E.-H.; Wang, S.; Yang, Y.; Li, V. C. (2008), *Fiber-Bridging Constitutive Law of Engineered Cementitious Composites*, Journal of Advanced Concrete Technology, 6(1), 181–193.
+
+文献 2 vol.% PVA 参数包括：
+
+| Parameter | Published value |
+|---|---:|
+| $d_f$ | 39 μm |
+| $L_f$ | 12 mm |
+| $E_f$ | 22 GPa |
+| $\sigma_{fu}$ | 1060 MPa |
+| $f$ | 0.20 |
+| $f'$ | 0.33 |
+| $E_m$ | 20 GPa |
+| $V_f$ | 2 vol.% |
+| $\tau_0$ | 1.31 MPa |
+| $G_d$ | 1.08 J/m² |
+| $\beta$ | 0.58 |
+
+### Published model hierarchy
+
+| Model level | Peak stress | Peak opening |
+|---|---:|---:|
+| Previous one-way pullout | **6.2 MPa** | **93 μm** |
+| Two-way pullout | 6.3 MPa | 130 μm |
+| + matrix spalling | 6.7 MPa | 131 μm |
+| + Cook–Gordon | 6.7 MPa | 133 μm |
+
+### Current implementation
+
+细化局部扫描结果约为：
+
+$$
+\boxed{\sigma_0\approx5.97\ \text{MPa}}
+$$
+
+$$
+\boxed{\delta_0\approx72\ \mu\text{m}}
+$$
+
+相对文献 one-way baseline：
+
+- peak stress error ≈ **−3.8%**；
+- peak opening ≈ **23% lower**。
+
+```mermaid
+xychart-beta
+    title "Yang 2008 M45 benchmark — peak response"
+    x-axis ["Published one-way", "Current one-way", "Published two-way", "Full model"]
+    y-axis "Peak stress (MPa)" 0 --> 8
+    bar [6.2, 5.97, 6.3, 6.7]
+```
+
+> 当前实现的学术定位是 **Yang/Lin one-way baseline**，并不声称已经实现 two-way pullout、matrix micro-spalling 与 Cook–Gordon 全模型。完整说明见 [`docs/LITERATURE_BENCHMARK.md`](docs/LITERATURE_BENCHMARK.md)。
+
+---
+
+## 8. Model maturity matrix
+
+| Module | Status | Recommended use |
 |---|---|---|
-| `delta` | 裂缝张开位移 | mm |
-| `sigma` | 桥接应力 | MPa |
-
-在该模式下，导入曲线被视为 $\sigma_0$、$\delta_0$ 与 $J_b'$ 的主要数据依据。程序会对曲线进行基本清洗与一致性检查，以保证积分和峰值识别具有明确的物理含义。
-
----
-
-### 4.2 理论桥接模拟模式
-
-理论模拟模式用于在缺少完整实验桥接曲线时进行机理分析和参数敏感性研究。程序基于单纤维拔出响应进行双重积分，估算宏观桥接应力曲线：
-
-$$
-\sigma(\delta)=\frac{8V_f}{\pi d_f^2L_f}
-\int_0^{\pi/2}\int_0^{L_f/2}P(\delta,l,\theta)\sin\theta\,dl\,d\theta
-$$
-
-模型中可考虑：
-
-- 纤维摩擦拔出；
-- 滑移硬化效应；
-- 倾角 snubbing 效应；
-- 纤维拉断截断；
-- PVA 纤维的简化化学脱粘阶段；
-- 端钩钢纤维的简化锚固贡献。
-
-需要强调的是：理论模拟模式更适合作为 **mechanistic sensitivity tool**，用于观察参数变化对桥接曲线形状、峰值应力和互补能的影响。若用于定量预测，应结合单纤维拔出试验或直接拉伸试验进行校准。
-
----
-
-## 5. 模型一致性与可追溯性
-
-材料计算中一个容易被忽视的问题是：输入参数、桥接曲线与最终 PSH 评价之间必须保持逻辑一致。如果修改了纤维参数、界面参数或模拟参数，却继续使用旧的桥接曲线，最终结果虽然可以被计算出来，但其物理含义已经不成立。
-
-因此，本项目将“可追溯性”作为计算框架的一部分：
-
-- 导入的实验曲线会被视为外部数据源；
-- 理论模拟曲线会记录生成该曲线时对应的参数组合；
-- 当影响桥接曲线的参数发生变化时，旧曲线不再被视为当前材料状态下的有效响应；
-- 最终导出结果会同时保留输入参数、桥接曲线与计算指标。
-
-这样做的目的不是为了显示软件细节，而是为了保证材料分析中的因果链条保持清晰：
+| Experimental `σ–δ` → $J_b'$ | ✅ Stable | **Formal quantitative analysis** |
+| $K_m$ / $J_{tip}$ / PSH | ✅ Stable | **Formal quantitative analysis** |
+| PE/PP one-way bridging | 🟢 Mechanistically mature | Sensitivity + calibrated prediction |
+| PVA one-way bridging | 🟡 Literature benchmarked | Mechanistic / semi-quantitative |
+| PVA two-way pullout | 🔵 Roadmap | Not implemented yet |
+| PVA matrix spalling | 🔵 Roadmap | Not implemented yet |
+| Cook–Gordon effect | 🔵 Roadmap | Not implemented yet |
+| Hooked steel | 🟡 Simplified | Calibration required |
 
 ```mermaid
 flowchart LR
-    A[材料与试验输入] --> B[界面参数]
-    A --> C[基体断裂参数]
-    A --> D[桥接曲线]
-    B --> E[微观力学计算]
-    C --> E
-    D --> E
-    E --> F[PSH 强度裕度]
-    E --> G[PSH 能量裕度]
-    F --> H[应变硬化潜力判断]
-    G --> H
+    A[Experimental σ-δ<br/>Stable]:::stable --> B[Jb′ / PSH<br/>Stable]:::stable
+    C[PE one-way<br/>Mature]:::mature --> B
+    D[PVA one-way<br/>Benchmarked]:::bench --> B
+    E[PVA two-way<br/>Roadmap]:::future --> F[Spalling<br/>Roadmap]:::future --> G[Cook-Gordon<br/>Roadmap]:::future
+
+    classDef stable fill:#d9f7e8,stroke:#1f8f5f,stroke-width:1.5px;
+    classDef mature fill:#e5f0ff,stroke:#2d6cdf,stroke-width:1.5px;
+    classDef bench fill:#fff3cd,stroke:#c99700,stroke-width:1.5px;
+    classDef future fill:#f1f3f5,stroke:#868e96,stroke-dasharray: 5 5;
 ```
 
 ---
 
-## 6. 输出指标
+## 9. Software architecture
 
-程序输出的主要结果如下：
+项目采用“物理核心与 GUI 解耦”的结构，保证核心公式可以在无界面环境下独立测试。
 
-| 输出指标 | 含义 | 学术解释 |
-|---|---|---|
-| $\tau_0$ | 平均界面摩擦应力 | 反映纤维—基体界面荷载传递能力 |
-| $K_m$ | 基体应力强度因子 | 表征基体裂纹扩展阻力 |
-| $J_{tip}$ | 裂尖能量需求 | 表征基体裂缝稳态扩展所需能量 |
-| $\sigma_0$ | 峰值桥接应力 | 表征纤维桥接系统最大承载能力 |
-| $\delta_0$ | 峰值对应裂缝张开位移 | 反映桥接峰值出现时的裂缝开口尺度 |
-| $J_b'$ | 桥接互补能 | 表征纤维桥接系统可用于裂缝稳定扩展的能量储备 |
-| $PSH_{strength}$ | 强度裕度 | 判断是否具备继续激活新裂缝的应力条件 |
-| $PSH_{energy}$ | 能量裕度 | 判断是否具备稳态裂缝扩展的能量条件 |
+```mermaid
+flowchart TB
+    subgraph Presentation[Presentation Layer]
+        UI[PySide6 UI]
+        Plot[Matplotlib plots]
+        Export[CSV / Excel export]
+    end
 
-这些指标不是孤立存在的。真正有价值的分析并不是简单判断“通过”或“不通过”，而是进一步识别限制材料延性的主控因素：是界面过弱、基体过韧、桥接能不足，还是峰值桥接强度不够。
+    subgraph Application[Application Layer]
+        Worker[QThread workers]
+        Project[ProjectModel]
+        Provenance[Simulation signature / provenance]
+    end
 
----
+    subgraph Domain[Domain / Physics Layer]
+        Engine[core.engine<br/>Km · Jtip · Jb′ · PSH]
+        Simulation[core.simulation<br/>fiber bridging]
+        Safe[core.simulation_safe<br/>physics validation]
+    end
 
-## 7. 程序结构
+    subgraph Validation[Validation Layer]
+        Tests[pytest regression tests]
+        Benchmark[Yang 2008 benchmark]
+    end
+
+    UI --> Worker
+    Worker --> Project
+    Worker --> Engine
+    Worker --> Simulation
+    Simulation --> Safe
+    Engine --> Plot
+    Project --> Export
+    Tests --> Engine
+    Tests --> Simulation
+    Benchmark --> Simulation
+```
+
+### Repository layout
 
 ```text
-ECC-Micromechanics-Calculator
+ECC-Micromechanics-Calculator/
 ├── core/
-│   ├── engine.py        # τ0、Km、Jtip、Jb'、PSH 判据计算
-│   └── simulation.py    # 理论纤维桥接曲线模拟
+│   ├── engine.py               # Km, Jtip, Jb′, PSH
+│   ├── simulation.py           # fiber pullout + bridging integration
+│   └── simulation_safe.py      # physical consistency guards
 ├── models/
-│   └── project.py       # 项目与试验序列数据结构
+│   └── project.py              # application data model
 ├── ui/
-│   ├── main_window.py   # PySide6 桌面交互界面
-│   ├── workers.py       # 后台计算与文件读写线程
-│   └── plot_widgets.py  # matplotlib 嵌入式绘图模块
+│   ├── main_window.py          # PySide6 desktop interface
+│   ├── workers.py              # threaded computation
+│   └── plot_widgets.py         # scientific visualization
 ├── utils/
-│   ├── io.py            # CSV 数据导入与清洗
-│   └── export.py        # 多工作表 Excel 导出
-└── tests/               # 核心计算与可追溯性测试
+│   ├── io.py                   # CSV ingestion / result export
+│   └── export.py               # structured Excel export
+├── tests/
+│   └── test_literature_benchmark.py
+├── docs/
+│   ├── MICROMECHANICS_MODEL.md
+│   ├── LITERATURE_BENCHMARK.md
+│   └── ROADMAP_MICROMECHANICS.md
+├── main.py
+├── pyproject.toml
+└── README.md
 ```
-
-项目将数值计算核心与图形界面分离，使 `core` 中的计算函数可以独立测试、复用和扩展。后续可以进一步迁移到 Jupyter Notebook、批处理脚本、Web 应用或论文数据分析流程中。
 
 ---
 
-## 8. 安装与运行
+## 10. Installation
 
-基础安装：
+### Requirements
+
+- Python **3.10+**
+- Windows / macOS / Linux
+
+### Clone
+
+```bash
+git clone https://github.com/liqinglq666/ECC-Micromechanics-Calculator.git
+cd ECC-Micromechanics-Calculator
+```
+
+### Recommended virtual environment
+
+```bash
+python -m venv .venv
+```
+
+Windows:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+### Install
 
 ```bash
 pip install -e .
 ```
 
-启用 Numba 可选加速：
-
-```bash
-pip install -e ".[accel]"
-```
-
-开发与测试环境：
+Development environment:
 
 ```bash
 pip install -e ".[dev]"
-pytest
 ```
 
-运行桌面程序：
+---
 
-```bash
-ecc-calc
-```
+## 11. Run
 
-或：
+### Desktop application
 
 ```bash
 python main.py
 ```
 
----
+or after installation:
 
-## 9. 推荐使用流程
+```bash
+ecc-calc
+```
 
-1. 建立一个或多个材料序列，例如不同纤维掺量、不同胶凝材料组成或不同界面处理方案；
-2. 输入单纤维拔出参数，计算界面摩擦应力 $\tau_0$；
-3. 输入基体三点弯曲断裂参数，计算 $K_m$ 与 $J_{tip}$；
-4. 导入实验 σ–δ 曲线，或使用理论桥接模拟生成初步曲线；
-5. 计算 $J_b'$、$PSH_{strength}$ 和 $PSH_{energy}$；
-6. 比较不同序列下强度裕度与能量裕度的变化；
-7. 判断限制 ECC 拉伸延性的主控因素；
-8. 导出结果，用于论文、报告或进一步数据分析。
+### Run tests
 
----
+```bash
+pytest
+```
 
-## 10. 模型假设与适用边界
+只运行文献 benchmark：
 
-为了保证计算过程清晰可解释，本项目保留并显式呈现以下假设：
-
-- $\tau_0$ 被视为由单纤维拔出峰值荷载反推得到的平均界面摩擦应力；
-- SENB 几何修正公式应在合理裂缝深度范围内使用；
-- $J_{tip}$ 的计算结果依赖于平面应力或平面应变假设；
-- 导入的 σ–δ 曲线应代表单调桥接包络，而不是任意循环加载路径；
-- 理论桥接模拟是简化机理模型，定量预测前应结合试验进行校准；
-- PSH 阈值属于材料设计判据，不应被理解为绝对失效边界。
-
-这些边界并不是项目缺陷，而是微观力学建模中必须被明确说明的前提。只有清楚知道模型假设，计算结果才具有学术解释价值。
+```bash
+pytest tests/test_literature_benchmark.py -v
+```
 
 ---
 
-## 11. 学术用途
+## 12. Example research workflow
 
-本项目可服务于以下工作：
+```mermaid
+sequenceDiagram
+    participant R as Researcher
+    participant UI as ECC Calculator
+    participant S as Bridging Simulator
+    participant E as PSH Engine
 
-- ECC/SHCC 配合比设计与筛选；
-- 单纤维拔出试验结果解释；
-- 基体断裂韧度对拉伸延性的影响分析；
-- 纤维桥接互补能计算与对比；
-- PE、PVA、Steel 等不同纤维体系的桥接机制比较；
-- 胶凝材料组成差异对 PSH 潜力的影响分析；
-- 毕业论文或研究报告中的微观力学计算章节；
-- 将实验数据、理论公式与可视化结果整合为可复现分析流程。
+    R->>UI: Input fiber / matrix / interface parameters
+    alt Experimental σ-δ
+        R->>UI: Import calibrated CSV
+    else Theoretical simulation
+        UI->>S: Build PE/PVA/Steel model
+        S->>S: 2D/3D orientation integration
+        S-->>UI: σ-δ curve
+    end
+    UI->>E: σ-δ + SENB + tensile parameters
+    E->>E: Km → Jtip
+    E->>E: σ0, δ0 → Jb′
+    E->>E: PSH_strength + PSH_energy
+    E-->>UI: Results + pass/fail assessment
+    UI-->>R: Curves / tables / export
+```
 
-项目的更深层目标，是把 ECC 设计从“经验配合比筛选”推进到“机制约束下的定量设计”：每一个 PSH 判断都应能追溯到具体的界面参数、基体断裂参数与桥接曲线特征。
+一个典型科研分析顺序：
+
+```python
+# conceptual workflow
+pullout_test -> tau_0
+SENB_test    -> K_m -> J_tip
+sigma_delta  -> sigma_0, delta_0, J_b_prime
+
+PSH_strength = sigma_0 / sigma_fc
+PSH_energy   = J_b_prime / J_tip
+```
 
 ---
 
-## 12. 联系方式
+## 13. Research-use guidance
 
-如需交流模型、算法或 ECC/SHCC 微观力学设计问题，可联系：
+### Recommended
 
-- **GitHub**: [@liqinglq666](https://github.com/liqinglq666)
-- **Email**: liqinglq666@gmail.com
+- 使用真实/标定 `σ–δ` 曲线计算最终 $J_b'$ 与 PSH；
+- PE-ECC 参数敏感性分析与 one-way bridge mechanics；
+- 不同基体、界面与纤维参数之间的机制比较；
+- 将实验、理论模拟与 PSH 指标放在同一分析框架中；
+- 使用文献 benchmark 检查代码升级是否破坏已有物理结果。
+
+### Use with caution
+
+- 未经标定的 PVA 定量裂缝开口预测；
+- hooked steel 机械锚固参数的跨体系直接迁移；
+- 将某一组默认参数视为“所有 ECC 的材料常数”；
+- 在不满足几何前提时强行套用 SENB 几何函数。
+
+### Not claimed yet
+
+当前版本**不声称完整实现**：
+
+1. PVA two-way pullout；
+2. matrix micro-spalling；
+3. Cook–Gordon effect；
+4. 完整端钩钢纤维塑性锚固模型。
+
+这些内容已经进入 [`ROADMAP_MICROMECHANICS.md`](docs/ROADMAP_MICROMECHANICS.md)。
+
+---
+
+## 14. Roadmap
+
+```mermaid
+gantt
+    title ECC Micromechanics Research Roadmap
+    dateFormat  YYYY-MM-DD
+    axisFormat  %Y-%m
+
+    section Core baseline
+    PE/PVA one-way correction       :done, a1, 2026-09-01, 7d
+    Yang 2008 literature benchmark  :done, a2, after a1, 5d
+
+    section Advanced PVA mechanics
+    Two-way pullout                 :active, b1, 2026-09-08, 14d
+    Matrix micro-spalling           :b2, after b1, 10d
+    Cook-Gordon effect              :b3, after b2, 10d
+
+    section Validation
+    Multi-literature benchmark set  :c1, after b1, 14d
+    Experimental calibration suite  :c2, after c1, 14d
+```
+
+> Roadmap represents development priorities rather than a promised release schedule.
+
+---
+
+## 15. Documentation
+
+- [`Micromechanics Model Notes`](docs/MICROMECHANICS_MODEL.md) — 当前桥接模型、随机取向与断裂处理
+- [`Literature Benchmark`](docs/LITERATURE_BENCHMARK.md) — Yang et al. (2008) M45 文献基准
+- [`Micromechanics Roadmap`](docs/ROADMAP_MICROMECHANICS.md) — two-way pullout、spalling、Cook–Gordon 后续路线
+
+---
+
+## 16. References
+
+1. **Kanda, T.; Li, V. C.** (2006). *Practical Design Criteria for Saturated Pseudo Strain Hardening Behavior in ECC*. Journal of Advanced Concrete Technology, 4(1), 59–72.
+2. **Yang, E.-H.; Wang, S.; Yang, Y.; Li, V. C.** (2008). *Fiber-Bridging Constitutive Law of Engineered Cementitious Composites*. Journal of Advanced Concrete Technology, 6(1), 181–193.
+3. ECC/SHCC micromechanics literature derived from the Li–Kanda–Lin fiber-bridging framework.
+
+---
+
+## 17. Scope & license
+
+This repository is currently distributed under a **Proprietary** license configuration as declared in `pyproject.toml`.
+
+Theoretical simulations should be interpreted according to their implemented model hierarchy and calibration status. For publication-grade quantitative claims, experimental evidence and independent calibration should take priority over uncalibrated theoretical outputs.
+
+---
+
+<div align="center">
+
+### ECC is not designed by strength alone.
+
+**Interface mechanics × Matrix fracture × Fiber bridging × Energy balance**
+
+`Micromechanics → Constitutive response → PSH → Material design`
+
+</div>
