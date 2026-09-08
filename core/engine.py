@@ -56,6 +56,7 @@ class SeriesParams:
     sim_G_d: float = 3.0                # J/m^2 (PVA only)
     sim_beta: float = 0.0               # PE default: no assumed slip-hardening
     sim_f_snubbing: float = 0.20
+    sim_tau0_override: float = 0.0       # MPa; 0 -> derive from pullout test
     sim_f_strength_reduction: float = 0.0
     sim_orientation: str = "3d"         # "3d" isotropic | "2d" planar
     sim_n_delta_points: int = 300
@@ -77,6 +78,7 @@ class SeriesParams:
             self.sim_G_d,
             self.sim_beta,
             self.sim_f_snubbing,
+            self.sim_tau0_override,
             self.sim_f_strength_reduction,
             self.sim_orientation,
             self.sim_n_delta_points,
@@ -287,7 +289,10 @@ def run_full_analysis(params: SeriesParams) -> AnalysisResult:
     delta_arr = df["delta"].to_numpy(dtype=float)
     sigma_arr = df["sigma"].to_numpy(dtype=float)
 
-    tau0 = calc_tau0(params.p_peak, params.d_f, params.l_e)
+    if params.sigma_delta_source == "simulation" and params.sim_tau0_override > 0.0:
+        tau0 = params.sim_tau0_override
+    else:
+        tau0 = calc_tau0(params.p_peak, params.d_f, params.l_e)
     km = calc_km(params.p_max, params.span, params.b, params.d, params.a0)
     j_tip = calc_j_tip(km, params.e_m, params.fracture_condition, params.poisson_ratio)
     sigma0, delta0, jb_prime = calc_jb_prime(delta_arr, sigma_arr)
