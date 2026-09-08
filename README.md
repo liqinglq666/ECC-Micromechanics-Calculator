@@ -266,7 +266,8 @@ stateDiagram-v2
 从桥接曲线提取峰值：
 
 $$
-(\delta_0,\sigma_0)=\operatorname*{arg\,max}_{\delta}\sigma(\delta)
+\sigma_0=\max_{\delta}\sigma(\delta),\qquad
+\sigma(\delta_0)=\sigma_0
 $$
 
 桥接互补能：
