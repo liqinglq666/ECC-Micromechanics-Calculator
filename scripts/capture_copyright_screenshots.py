@@ -1,8 +1,9 @@
 """Generate real UI screenshots for software copyright documentation.
 
-This script runs the actual PySide6 application and the current micromechanics
-engine. It creates three PE-ECC series, performs theoretical sigma-delta
-simulation and full PSH analysis, then captures the rendered application tabs.
+The script starts the actual PySide6 application, computes three PE-ECC cases
+with the production engine, populates the real project model, and captures the
+rendered tabs.  It is intentionally deterministic so screenshots are
+reproducible in GitHub Actions.
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QScrollArea, QTreeWidgetItem
+from PySide6.QtWidgets import QApplication, QTreeWidgetItem
 
 from core.engine import SeriesParams, calc_tau0, run_full_analysis
 from core.simulation_safe import (
@@ -45,7 +46,6 @@ def _capture(app: QApplication, window: MainWindow, filename: str) -> None:
 
 
 def _set_visible_form(window: MainWindow) -> None:
-    """Populate the visible first-series form with a representative PE-ECC case."""
     window._sb_name.setText("PE-ECC-1")
     window._sb_varval.setValue(0.75)
     window._sb_p_peak.setValue(0.75)
@@ -58,7 +58,6 @@ def _set_visible_form(window: MainWindow) -> None:
     window._sb_a0.setValue(16.0)
     window._sb_e_m.setValue(20.0)
     window._sb_sigma_fc.setValue(3.2)
-
     window._radio_sim.setChecked(True)
     window._sd_stack.setCurrentIndex(1)
     window._cmb_fiber_type.setCurrentIndex(0)
@@ -68,23 +67,13 @@ def _set_visible_form(window: MainWindow) -> None:
     window._sb_sigma_fu.setValue(2600.0)
     window._sb_beta.setValue(0.0)
     window._sb_f_snubbing.setValue(0.20)
+    window._sb_tau0_override.setValue(0.0)
+    window._sb_f_strength_reduction.setValue(0.0)
+    window._cmb_orientation.setCurrentIndex(0)
     window._sb_n_points.setValue(300)
     window._write_form_to_model(0)
-    window._model.get_entry(0).params.sigma_delta_source = "simulation"
-
-
-def _capture_simulation_controls(app: QApplication, window: MainWindow) -> None:
-    """Scroll the real left parameter pane to expose the theoretical simulation controls."""
-    scroll_areas = window.findChildren(QScrollArea)
-    if not scroll_areas:
-        raise RuntimeError("No QScrollArea found in MainWindow")
-    left_scroll = scroll_areas[0]
-    bar = left_scroll.verticalScrollBar()
-    previous = bar.value()
-    bar.setValue(bar.maximum())
-    _capture(app, window, "02b_theoretical_simulation_controls.png")
-    bar.setValue(previous)
-    _settle(app, 300)
+    params = window._model.get_entry(0).params
+    params.sigma_delta_mode = "simulation"
 
 
 def _build_and_run(
@@ -110,6 +99,7 @@ def _build_and_run(
         fracture_condition="plane_stress",
         poisson_ratio=0.20,
         sigma_fc=sigma_fc,
+        sigma_delta_mode="simulation",
         sigma_delta_source="simulation",
         sim_fiber_type="PE",
         sim_V_f=0.02,
@@ -159,24 +149,33 @@ def _populate_real_results(window: MainWindow) -> None:
         ("PE-ECC-3", 1.05, 1.05, 210.0, 24.0, 3.40),
     ]
 
-    for idx, case in enumerate(cases):
+    first_id: str | None = None
+    for index, case in enumerate(cases):
         params, result = _build_and_run(*case)
-        if idx == 0:
+        if index == 0:
             entry = window._model.get_entry(0)
             entry.params = params
             entry.result = result
-            window._tree.topLevelItem(0).setText(0, params.name)
+            first_id = entry.series_id
+            item = window._tree.topLevelItem(0)
+            item.setText(0, params.name)
+            item.setData(0, Qt.ItemDataRole.UserRole, entry.series_id)
         else:
             entry = window._model.add_series(params)
             entry.result = result
-            window._tree.addTopLevelItem(QTreeWidgetItem([params.name]))
+            item = QTreeWidgetItem([params.name])
+            item.setData(0, Qt.ItemDataRole.UserRole, entry.series_id)
+            window._tree.addTopLevelItem(item)
 
+    assert first_id is not None
     window._model.variable_name = "Pullout peak load P_peak (N)"
     window._var_name_edit.setText(window._model.variable_name)
-    window._tree.setCurrentItem(window._tree.topLevelItem(0))
-    window._current_index = 0
-    window._populate_form(0)
-    window._refresh_single_tab(0)
+    first_item = window._tree_item_for_id(first_id)
+    assert first_item is not None
+    window._tree.setCurrentItem(first_item)
+    window._current_series_id = first_id
+    window._populate_form_by_id(first_id)
+    window._refresh_single_by_id(first_id)
     window._refresh_summary_tab()
     window._refresh_comparative_tab()
 
@@ -199,16 +198,19 @@ def main() -> int:
     window._on_add_series()
     _set_visible_form(window)
     _capture(app, window, "02_pe_ecc_parameter_input.png")
-    _capture_simulation_controls(app, window)
+
+    window._left_scroll.verticalScrollBar().setValue(
+        window._left_scroll.verticalScrollBar().maximum()
+    )
+    _capture(app, window, "02b_theoretical_simulation_controls.png")
+    window._left_scroll.verticalScrollBar().setValue(0)
 
     _populate_real_results(window)
 
     window._tabs.setCurrentIndex(0)
     _capture(app, window, "03_single_series_results.png")
-
     window._tabs.setCurrentIndex(1)
     _capture(app, window, "04_data_summary.png")
-
     window._tabs.setCurrentIndex(2)
     _capture(app, window, "05_comparative_analytics.png")
 
@@ -221,8 +223,7 @@ def main() -> int:
     )
     print(f"exported: {export_path}")
 
-    provenance = OUT / "RUN_PROVENANCE.txt"
-    provenance.write_text(
+    (OUT / "RUN_PROVENANCE.txt").write_text(
         "ECC Micromechanics Calculator real UI capture\n"
         "source: GitHub Actions runner\n"
         "UI: PySide6 / Qt Fusion / offscreen platform plugin\n"
