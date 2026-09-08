@@ -72,18 +72,22 @@ class SimulationWorker(QThread):
     def __init__(self, series_index: int, params: SeriesParams) -> None:
         super().__init__()
         self._series_index = series_index
-
-        denom = math.pi * params.d_f * params.l_e
-        if denom <= 0.0:
-            raise ValueError(
-                f"Cannot compute tau_0: d_f={params.d_f!r} and l_e={params.l_e!r} "
-                "must both be positive non-zero values."
-            )
-        if params.p_peak <= 0.0:
-            raise ValueError(f"Cannot compute tau_0: P_peak must be positive; got {params.p_peak!r}.")
-
-        self._tau_0 = params.p_peak / denom
         self._params = copy.copy(params)
+
+        if params.sim_tau0_override > 0.0:
+            self._tau_0 = params.sim_tau0_override
+        else:
+            denom = math.pi * params.d_f * params.l_e
+            if denom <= 0.0:
+                raise ValueError(
+                    f"Cannot compute tau_0: d_f={params.d_f!r} and l_e={params.l_e!r} "
+                    "must both be positive non-zero values."
+                )
+            if params.p_peak <= 0.0:
+                raise ValueError(
+                    f"Cannot compute tau_0: P_peak must be positive; got {params.p_peak!r}."
+                )
+            self._tau_0 = params.p_peak / denom
         self._simulation_signature = self._params.simulation_signature()
 
     def run(self) -> None:
@@ -99,11 +103,20 @@ class SimulationWorker(QThread):
                 f_snubbing=self._params.sim_f_snubbing,
                 n_delta_points=self._params.sim_n_delta_points,
                 E_m=self._params.e_m,
+                f_strength_reduction=self._params.sim_f_strength_reduction,
+                orientation=self._params.sim_orientation,
             )
 
-            pe_params = PEFiberParams(beta=self._params.sim_beta) if fiber_type is FiberType.PE else None
+            pe_params = (
+                PEFiberParams(beta=self._params.sim_beta)
+                if fiber_type is FiberType.PE
+                else None
+            )
             pva_params = (
-                PVAFiberParams(G_d=self._params.sim_G_d, beta=self._params.sim_beta)
+                PVAFiberParams(
+                    G_d=self._params.sim_G_d,
+                    beta=self._params.sim_beta,
+                )
                 if fiber_type is FiberType.PVA
                 else None
             )
@@ -126,7 +139,9 @@ class SimulationWorker(QThread):
             df = simulate_sigma_delta(
                 common,
                 pullout_model,
-                progress_callback=lambda current, total: self.progress.emit(current, total),
+                progress_callback=lambda current, total: self.progress.emit(
+                    current, total
+                ),
             )
             df.attrs["source"] = "simulation"
             df.attrs["simulation_signature"] = self._simulation_signature
@@ -134,7 +149,8 @@ class SimulationWorker(QThread):
         except KeyError:
             self.error.emit(
                 self._series_index,
-                f"Unknown fiber type: '{self._params.sim_fiber_type}'. Expected PE, PVA or STEEL.",
+                f"Unknown fiber type: '{self._params.sim_fiber_type}'. "
+                "Expected PE, PVA or STEEL.",
             )
         except ValueError as exc:
             self.error.emit(self._series_index, str(exc))
