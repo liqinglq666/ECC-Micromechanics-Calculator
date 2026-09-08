@@ -44,14 +44,22 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "N", "ANN"]
 ignore = [
-    "ANN101",
-    "ANN102",
     "ANN201",
     "ANN202",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ANN"]
+# Tests prioritize behavioral clarity over production type annotations.
+"tests/*" = ["ANN", "E741"]
+# Public scientific parameter names intentionally mirror notation used in the UI/docs.
+"core/engine.py" = ["N815"]
+# `l` denotes embedment length in the published micromechanics equations.
+"core/simulation.py" = ["E741"]
+# Qt virtual methods must retain Qt's camelCase method names. Long UI/CSS strings are
+# clearer when kept intact rather than split solely for a line-length rule.
+"ui/main_window.py" = ["N802", "E501"]
+"ui/plot_widgets.py" = ["E501"]
+"ui/result_table_model.py" = ["N802", "ANN401"]
 
 [tool.mypy]
 python_version = "3.10"
