@@ -5,6 +5,7 @@ Responsibilities limited to:
   2. Instantiating and showing the main window.
   3. Returning the event-loop exit code to the OS.
 """
+
 from __future__ import annotations
 
 import sys

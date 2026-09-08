@@ -9,13 +9,14 @@ The one-way PVA path is benchmarkable against the "previous simplified model"
 reported by Yang et al. (2008). Two-way pullout, matrix micro-spalling, and
 Cook-Gordon effects are intentionally not represented here.
 """
+
 from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -33,14 +34,14 @@ class CommonFiberParams:
     V_f: float
     L_f: float
     d_f: float
-    E_f: float          # GPa
-    sigma_fu: float     # MPa, strength at zero inclination
-    tau_0: float        # MPa
+    E_f: float  # GPa
+    sigma_fu: float  # MPa, strength at zero inclination
+    tau_0: float  # MPa
     f_snubbing: float
     n_delta_points: int = 300
     E_m: float | None = None  # GPa; eta = Vf Ef / (Vm Em)
     f_strength_reduction: float = 0.0
-    orientation: str = "3d"   # "3d" isotropic | "2d" planar random
+    orientation: str = "3d"  # "3d" isotropic | "2d" planar random
 
     def validate(self) -> None:
         if not (0.0 <= self.V_f < 1.0):
@@ -61,13 +62,10 @@ class CommonFiberParams:
             raise ValueError(f"f_snubbing cannot be negative; got {self.f_snubbing}")
         if self.f_strength_reduction < 0.0:
             raise ValueError(
-                "f_strength_reduction cannot be negative; "
-                f"got {self.f_strength_reduction}"
+                f"f_strength_reduction cannot be negative; got {self.f_strength_reduction}"
             )
         if self.orientation not in {"2d", "3d"}:
-            raise ValueError(
-                f"orientation must be '2d' or '3d'; got {self.orientation!r}"
-            )
+            raise ValueError(f"orientation must be '2d' or '3d'; got {self.orientation!r}")
         if self.n_delta_points < 2:
             raise ValueError("n_delta_points must be at least 2.")
 
@@ -91,7 +89,7 @@ class PEFiberParams:
 
 @dataclass
 class PVAFiberParams:
-    G_d: float = 3.0      # J/m^2
+    G_d: float = 3.0  # J/m^2
     beta: float = 0.50
 
     def validate(self) -> None:
@@ -122,12 +120,10 @@ class FiberPulloutModel(ABC):
         self._rupture_force_0 = common.sigma_fu * self._A_f
 
     @abstractmethod
-    def _straight_pullout(self, delta: float, l: float) -> float:
-        ...
+    def _straight_pullout(self, delta: float, l: float) -> float: ...
 
     @abstractmethod
-    def _max_straight_pullout_up_to(self, delta: float, l: float) -> float:
-        ...
+    def _max_straight_pullout_up_to(self, delta: float, l: float) -> float: ...
 
     def max_debond_displacement(self, l: float) -> float:
         return 0.0
@@ -138,9 +134,7 @@ class FiberPulloutModel(ABC):
 
     def rupture_force(self, theta: float) -> float:
         """Inclination-reduced tensile capacity, Yang et al. Eq. (7)."""
-        return self._rupture_force_0 * math.exp(
-            -self._c.f_strength_reduction * theta
-        )
+        return self._rupture_force_0 * math.exp(-self._c.f_strength_reduction * theta)
 
     def get_pullout_force(self, delta: float, l: float, theta: float) -> float:
         if delta < 0.0 or l <= 0.0:
@@ -170,9 +164,7 @@ class _DebondSlidingModel(FiberPulloutModel):
         eta1 = 1.0 + self._c.eta
         gd = self._gd_n_per_mm()
         friction_term = 2.0 * tau * l**2 * eta1 / (ef * d)
-        chemical_term = math.sqrt(
-            max(0.0, 8.0 * gd * l**2 * eta1 / (ef * d))
-        )
+        chemical_term = math.sqrt(max(0.0, 8.0 * gd * l**2 * eta1 / (ef * d)))
         return max(friction_term + chemical_term, 1e-12)
 
     def max_debond_displacement(self, l: float) -> float:
@@ -184,22 +176,14 @@ class _DebondSlidingModel(FiberPulloutModel):
         d = self._c.d_f
         eta1 = 1.0 + self._c.eta
         energy = self._c.tau_0 * max(delta, 0.0) + self._gd_n_per_mm()
-        return math.pi * math.sqrt(
-            max(0.0, ef * d**3 * eta1 * energy / 2.0)
-        )
+        return math.pi * math.sqrt(max(0.0, ef * d**3 * eta1 * energy / 2.0))
 
     def _sliding_force(self, slip: float, l: float) -> float:
         """Post-debond one-way pullout force (Yang et al. Eq. 13)."""
         if slip < 0.0 or slip >= l:
             return 0.0
         multiplier = max(0.0, 1.0 + self._beta * slip / self._c.d_f)
-        return (
-            math.pi
-            * self._c.d_f
-            * self._c.tau_0
-            * (l - slip)
-            * multiplier
-        )
+        return math.pi * self._c.d_f * self._c.tau_0 * (l - slip) * multiplier
 
     def _straight_pullout(self, delta: float, l: float) -> float:
         delta_d = self._debond_displacement(l)
@@ -275,13 +259,7 @@ class SteelFiberModel(FiberPulloutModel):
         if delta <= 0.0 or delta >= l:
             return 0.0
         mobilization = min(delta / max(self._c.d_f, 1e-12), 1.0)
-        friction = (
-            math.pi
-            * self._c.d_f
-            * self._c.tau_0
-            * (l - delta)
-            * mobilization
-        )
+        friction = math.pi * self._c.d_f * self._c.tau_0 * (l - delta) * mobilization
         return friction + self._anchor_force(delta)
 
     def _max_straight_pullout_up_to(self, delta: float, l: float) -> float:
@@ -348,22 +326,15 @@ def simulate_sigma_at_delta(
 
     result = 0.0
     for i, theta_i in enumerate(theta):
-        orientation_weight = _orientation_weight(
-            float(theta_i), common.orientation
-        )
+        orientation_weight = _orientation_weight(float(theta_i), common.orientation)
         inner = 0.0
         for j, l_j in enumerate(embedment):
-            inner += (
-                embedment_weights[j]
-                * pullout_model.get_pullout_force(
-                    float(delta), float(l_j), float(theta_i)
-                )
+            inner += embedment_weights[j] * pullout_model.get_pullout_force(
+                float(delta), float(l_j), float(theta_i)
             )
         result += theta_weights[i] * orientation_weight * inner
 
-    prefactor = (8.0 * common.V_f) / (
-        math.pi * common.d_f**2 * common.L_f
-    )
+    prefactor = (8.0 * common.V_f) / (math.pi * common.d_f**2 * common.L_f)
     return float(prefactor * result)
 
 
@@ -384,15 +355,11 @@ def simulate_sigma_delta(
     total = len(delta_arr)
 
     for idx, delta in enumerate(delta_arr):
-        sigma_values.append(
-            simulate_sigma_at_delta(common, pullout_model, float(delta))
-        )
+        sigma_values.append(simulate_sigma_at_delta(common, pullout_model, float(delta)))
         if progress_callback is not None:
             progress_callback(idx + 1, total)
 
-    df = pd.DataFrame(
-        {"delta": delta_arr, "sigma": np.asarray(sigma_values, dtype=float)}
-    )
+    df = pd.DataFrame({"delta": delta_arr, "sigma": np.asarray(sigma_values, dtype=float)})
     df.attrs["source"] = "simulation"
     df.attrs["model_version"] = "one-way-yang2008-v3"
     df.attrs["orientation"] = common.orientation

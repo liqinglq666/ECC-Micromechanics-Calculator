@@ -1,13 +1,18 @@
+"""Background workers for file loading, simulation, and batch analysis.
+
+Workers communicate with the UI exclusively through stable series UUIDs.
+No worker relies on mutable list indices, and no custom signal shadows
+QThread.finished.
+"""
+
 from __future__ import annotations
 
 import copy
-import math
 from pathlib import Path
 
-import pandas as pd
 from PySide6.QtCore import QThread, Signal
 
-from core.engine import AnalysisResult, SeriesParams, run_full_analysis
+from core.engine import AnalysisResult, SeriesParams, calc_tau0, run_full_analysis
 from core.simulation_safe import (
     CommonFiberParams,
     FiberType,
@@ -22,73 +27,87 @@ from utils.io import DataLoadError, load_sigma_delta_csv
 
 
 class CsvLoaderWorker(QThread):
-    loaded: Signal = Signal(int, object, object)
-    error: Signal = Signal(int, str)
+    loaded = Signal(str, object, object)
+    failed = Signal(str, str)
 
-    def __init__(self, series_index: int, csv_path: Path) -> None:
+    def __init__(self, series_id: str, csv_path: Path) -> None:
         super().__init__()
-        self._series_index = series_index
+        self._series_id = series_id
         self._csv_path = csv_path
 
     def run(self) -> None:
+        if self.isInterruptionRequested():
+            return
         try:
             df = load_sigma_delta_csv(self._csv_path)
-            self.loaded.emit(self._series_index, df, self._csv_path)
-        except (FileNotFoundError, DataLoadError) as exc:
-            self.error.emit(self._series_index, str(exc))
+            if not self.isInterruptionRequested():
+                self.loaded.emit(self._series_id, df, self._csv_path)
+        except (FileNotFoundError, DataLoadError, OSError) as exc:
+            self.failed.emit(self._series_id, str(exc))
+        except Exception as exc:  # keep thread failures visible to the user
+            self.failed.emit(self._series_id, f"Unexpected CSV load error: {exc}")
 
 
 class BatchAnalysisWorker(QThread):
-    series_done: Signal = Signal(int, object)
-    progress: Signal = Signal(int, int)
-    finished: Signal = Signal()
-    error: Signal = Signal(int, str)
+    series_done = Signal(str, object)
+    series_failed = Signal(str, str)
+    progress = Signal(int, int)
+    completed = Signal(int, int)
 
     def __init__(self, model: ProjectModel) -> None:
         super().__init__()
-        self._params_snapshot: list[tuple[int, SeriesParams]] = [
-            (index, copy.copy(entry.params))
-            for index, entry in enumerate(model)
-            if entry.params.sigma_delta_df is not None
+        self._params_snapshot: list[tuple[str, SeriesParams]] = [
+            (entry.series_id, copy.copy(entry.params)) for entry in model
         ]
 
     def run(self) -> None:
         total = len(self._params_snapshot)
-        for current, (index, params) in enumerate(self._params_snapshot, start=1):
+        succeeded = 0
+
+        for current, (series_id, params) in enumerate(self._params_snapshot, start=1):
+            if self.isInterruptionRequested():
+                break
             try:
                 result: AnalysisResult = run_full_analysis(params)
-                self.series_done.emit(index, result)
+                self.series_done.emit(series_id, result)
+                succeeded += 1
             except ValueError as exc:
-                self.error.emit(index, str(exc))
+                self.series_failed.emit(series_id, str(exc))
+            except Exception as exc:
+                self.series_failed.emit(series_id, f"Unexpected analysis error: {exc}")
             self.progress.emit(current, total)
-        self.finished.emit()
+
+        if not self.isInterruptionRequested():
+            self.completed.emit(succeeded, total)
 
 
 class SimulationWorker(QThread):
-    progress: Signal = Signal(int, int)
-    finished: Signal = Signal(int, object)
-    error: Signal = Signal(int, str)
+    progress = Signal(str, int, int)
+    result_ready = Signal(str, object)
+    failed = Signal(str, str)
+    cancelled = Signal(str)
 
-    def __init__(self, series_index: int, params: SeriesParams) -> None:
+    def __init__(self, series_id: str, params: SeriesParams) -> None:
         super().__init__()
-        self._series_index = series_index
+        self._series_id = series_id
         self._params = copy.copy(params)
 
-        if params.sim_tau0_override > 0.0:
-            self._tau_0 = params.sim_tau0_override
+        if self._params.d_f <= 0.0:
+            raise ValueError(f"d_f must be positive; got {self._params.d_f}")
+        if self._params.sim_tau0_override > 0.0:
+            self._tau_0 = self._params.sim_tau0_override
         else:
-            denom = math.pi * params.d_f * params.l_e
-            if denom <= 0.0:
-                raise ValueError(
-                    f"Cannot compute tau_0: d_f={params.d_f!r} and l_e={params.l_e!r} "
-                    "must both be positive non-zero values."
-                )
-            if params.p_peak <= 0.0:
-                raise ValueError(
-                    f"Cannot compute tau_0: P_peak must be positive; got {params.p_peak!r}."
-                )
-            self._tau_0 = params.p_peak / denom
+            self._tau_0 = calc_tau0(
+                self._params.p_peak,
+                self._params.d_f,
+                self._params.l_e,
+            )
         self._simulation_signature = self._params.simulation_signature()
+
+    def _report_progress(self, current: int, total: int) -> None:
+        if self.isInterruptionRequested():
+            raise InterruptedError
+        self.progress.emit(self._series_id, current, total)
 
     def run(self) -> None:
         try:
@@ -108,15 +127,10 @@ class SimulationWorker(QThread):
             )
 
             pe_params = (
-                PEFiberParams(beta=self._params.sim_beta)
-                if fiber_type is FiberType.PE
-                else None
+                PEFiberParams(beta=self._params.sim_beta) if fiber_type is FiberType.PE else None
             )
             pva_params = (
-                PVAFiberParams(
-                    G_d=self._params.sim_G_d,
-                    beta=self._params.sim_beta,
-                )
+                PVAFiberParams(G_d=self._params.sim_G_d, beta=self._params.sim_beta)
                 if fiber_type is FiberType.PVA
                 else None
             )
@@ -139,20 +153,25 @@ class SimulationWorker(QThread):
             df = simulate_sigma_delta(
                 common,
                 pullout_model,
-                progress_callback=lambda current, total: self.progress.emit(
-                    current, total
-                ),
+                progress_callback=self._report_progress,
             )
             df.attrs["source"] = "simulation"
             df.attrs["simulation_signature"] = self._simulation_signature
-            self.finished.emit(self._series_index, df)
+
+            if self.isInterruptionRequested():
+                self.cancelled.emit(self._series_id)
+                return
+            self.result_ready.emit(self._series_id, df)
+        except InterruptedError:
+            self.cancelled.emit(self._series_id)
         except KeyError:
-            self.error.emit(
-                self._series_index,
-                f"Unknown fiber type: '{self._params.sim_fiber_type}'. "
-                "Expected PE, PVA or STEEL.",
+            self.failed.emit(
+                self._series_id,
+                f"Unknown fiber type: '{self._params.sim_fiber_type}'. Expected PE, PVA or STEEL.",
             )
         except ValueError as exc:
-            self.error.emit(self._series_index, str(exc))
+            self.failed.emit(self._series_id, str(exc))
         except (RuntimeError, ArithmeticError, OverflowError) as exc:
-            self.error.emit(self._series_index, f"Simulation failed: {exc}")
+            self.failed.emit(self._series_id, f"Simulation failed: {exc}")
+        except Exception as exc:
+            self.failed.emit(self._series_id, f"Unexpected simulation error: {exc}")

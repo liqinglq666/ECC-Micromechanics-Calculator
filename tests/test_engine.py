@@ -90,6 +90,7 @@ def _valid_params(df: pd.DataFrame) -> SeriesParams:
         a0=16.0,
         e_m=20.0,
         sigma_fc=2.5,
+        sigma_delta_mode="csv",
         sigma_delta_source="csv",
         sigma_delta_df=df,
     )
@@ -108,13 +109,41 @@ def test_run_full_analysis_rejects_stale_simulation_signature() -> None:
     df.attrs["source"] = "simulation"
     df.attrs["simulation_signature"] = "old-signature"
     params = _valid_params(df)
+    params.sigma_delta_mode = "simulation"
     params.sigma_delta_source = "simulation"
     with pytest.raises(ValueError, match="stale simulated"):
         run_full_analysis(params)
 
 
 def test_simulation_signature_changes_when_matrix_modulus_changes() -> None:
-    p = SeriesParams(e_m=20.0)
-    sig1 = p.simulation_signature()
-    p.e_m = 25.0
-    assert p.simulation_signature() != sig1
+    params = SeriesParams(e_m=20.0)
+    sig1 = params.simulation_signature()
+    params.e_m = 25.0
+    assert params.simulation_signature() != sig1
+
+
+def test_tau_override_decouples_signature_from_pullout_peak_and_embedment_length() -> None:
+    params = SeriesParams(
+        p_peak=100.0,
+        d_f=0.04,
+        l_e=6.0,
+        sim_tau0_override=1.25,
+    )
+    signature = params.simulation_signature()
+    params.p_peak = 999.0
+    params.l_e = 12.0
+    assert params.simulation_signature() == signature
+
+
+def test_run_full_analysis_uses_tau_override_for_simulated_curve() -> None:
+    df = _positive_energy_curve()
+    params = _valid_params(df)
+    params.sigma_delta_mode = "simulation"
+    params.sigma_delta_source = "simulation"
+    params.sim_tau0_override = 1.75
+    df.attrs["source"] = "simulation"
+    df.attrs["simulation_signature"] = params.simulation_signature()
+
+    result = run_full_analysis(params)
+
+    assert result.tau0 == pytest.approx(1.75)

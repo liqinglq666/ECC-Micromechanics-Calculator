@@ -1,74 +1,111 @@
-"""models/project.py
+"""Application-level project model for ECC Micromechanics Calculator.
 
-Application-level data model. Single source of truth for all series data.
-Zero Qt dependencies — keeps the domain layer independently testable.
+The model is deliberately Qt-free.  Each series owns a stable UUID so
+background workers and UI selections never depend on mutable list indices.
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator, Optional
+from uuid import uuid4
 
 from core.engine import AnalysisResult, SeriesParams
-from core.simulation import FiberType
+
+
+def _new_series_id() -> str:
+    return uuid4().hex
 
 
 @dataclass
 class SeriesEntry:
-    """One mix-design series: params + optional computed result."""
+    """One mix-design series with a stable identity and optional result."""
 
     params: SeriesParams
-    result: Optional[AnalysisResult] = field(default=None)
+    result: AnalysisResult | None = None
+    series_id: str = field(default_factory=_new_series_id)
 
 
 class ProjectModel:
-    """
-    Ordered collection of SeriesEntry objects plus project-level metadata.
-
-    All mutation goes through explicit methods so the UI layer can call them
-    and then refresh itself — no implicit state sharing.
-    """
+    """Ordered collection of series plus project-level comparison metadata."""
 
     def __init__(self) -> None:
         self._entries: list[SeriesEntry] = []
         self.variable_name: str = "Variable"
-
-        # Monotonically increasing counter for series naming.
-        # Never decremented on removal, so names stay unique even after
-        # delete-then-add sequences (avoids "Series 3 / Series 3" collisions).
         self._series_counter: int = 0
 
     # ------------------------------------------------------------------
     # Collection interface
     # ------------------------------------------------------------------
 
-    def add_series(self, params: Optional[SeriesParams] = None) -> SeriesEntry:
-        """Append a new series (empty by default) and return it."""
+    def add_series(
+        self,
+        params: SeriesParams | None = None,
+        *,
+        series_id: str | None = None,
+    ) -> SeriesEntry:
+        """Append and return a new series.
+
+        Auto-generated display names use a monotonic counter so deleting and
+        re-adding series cannot create duplicate default names.
+        """
         if params is None:
             self._series_counter += 1
             params = SeriesParams(name=f"Series {self._series_counter}")
-        entry = SeriesEntry(params=params)
+        entry = SeriesEntry(params=params, series_id=series_id or _new_series_id())
         self._entries.append(entry)
         return entry
 
     def remove_series(self, index: int) -> None:
-        """
-        Remove series at *index*.
-
-        Raises IndexError for out-of-range indices so that bugs in the UI
-        layer are surfaced immediately rather than silently swallowed.
-        """
+        """Compatibility index-based removal used by existing callers/tests."""
         if not (0 <= index < len(self._entries)):
             raise IndexError(
-                f"Series index {index} is out of range "
-                f"(collection length = {len(self._entries)})."
+                f"Series index {index} is out of range (collection length = {len(self._entries)})."
             )
+        self._entries.pop(index)
+
+    def remove_series_by_id(self, series_id: str) -> None:
+        index = self.index_of(series_id)
+        if index < 0:
+            raise KeyError(f"Unknown series_id: {series_id}")
         self._entries.pop(index)
 
     def get_entry(self, index: int) -> SeriesEntry:
         return self._entries[index]
 
+    def get_entry_by_id(self, series_id: str) -> SeriesEntry:
+        index = self.index_of(series_id)
+        if index < 0:
+            raise KeyError(f"Unknown series_id: {series_id}")
+        return self._entries[index]
+
+    def find_entry(self, series_id: str) -> SeriesEntry | None:
+        index = self.index_of(series_id)
+        return self._entries[index] if index >= 0 else None
+
+    def index_of(self, series_id: str) -> int:
+        for index, entry in enumerate(self._entries):
+            if entry.series_id == series_id:
+                return index
+        return -1
+
     def set_result(self, index: int, result: AnalysisResult) -> None:
+        """Compatibility index-based setter."""
         self._entries[index].result = result
+
+    def set_result_by_id(self, series_id: str, result: AnalysisResult) -> None:
+        self.get_entry_by_id(series_id).result = result
+
+    def invalidate_result(self, series_id: str) -> None:
+        self.get_entry_by_id(series_id).result = None
+
+    def clear_curve(self, series_id: str) -> None:
+        """Discard the active bridging curve while preserving the selected mode."""
+        entry = self.get_entry_by_id(series_id)
+        entry.result = None
+        entry.params.sigma_delta_df = None
+        entry.params.sigma_delta_path = None
+        entry.params.sigma_delta_source = "none"
 
     def __len__(self) -> int:
         return len(self._entries)
@@ -80,58 +117,35 @@ class ProjectModel:
         return self._entries[index]
 
     # ------------------------------------------------------------------
-    # Convenience views used by plot and table layers
+    # Views used by the UI/export layer
     # ------------------------------------------------------------------
 
     def computed_results(self) -> list[AnalysisResult]:
-        """Return only results for series that have been analysed."""
-        return [
-            entry.result
-            for entry in self._entries
-            if entry.result is not None
-        ]
+        return [entry.result for entry in self._entries if entry.result is not None]
+
+    def computed_entries(self) -> list[SeriesEntry]:
+        return [entry for entry in self._entries if entry.result is not None]
 
     def x_labels(self) -> list[str]:
-        """
-        Build X-axis tick labels for comparative charts.
-
-        Uses variable_value when all analysed series have unique values;
-        falls back to series names to avoid ambiguous duplicate labels.
-        """
-        analysed = [
-            entry for entry in self._entries if entry.result is not None
-        ]
+        analysed = self.computed_entries()
         if not analysed:
             return []
 
-        values = [e.params.variable_value for e in analysed]
+        values = [entry.params.variable_value for entry in analysed]
         if len(set(values)) == len(values):
-            return [str(v) for v in values]
-
-        # NOTE: duplicate variable values — fall back to series names so
-        # charts remain readable without silent data collisions.
-        return [e.params.name for e in analysed]
+            return [str(value) for value in values]
+        return [entry.params.name for entry in analysed]
 
     def all_params(self) -> list[SeriesParams]:
         return [entry.params for entry in self._entries]
 
     def clear_results(self, also_clear_sigma_delta: bool = False) -> None:
-        """
-        Invalidate all computed results (e.g. after a global param edit).
-
-        Parameters
-        ----------
-        also_clear_sigma_delta : bool, default False
-            When True, also discards the cached σ-δ DataFrame and resets
-            sigma_delta_source to "none".  Pass True whenever the user has
-            changed simulation parameters so that the next run re-simulates
-            from scratch rather than reusing a stale curve.
-        """
         for entry in self._entries:
             entry.result = None
             if also_clear_sigma_delta:
                 entry.params.sigma_delta_df = None
+                entry.params.sigma_delta_path = None
                 entry.params.sigma_delta_source = "none"
 
     def is_empty(self) -> bool:
-        return len(self._entries) == 0
+        return not self._entries
