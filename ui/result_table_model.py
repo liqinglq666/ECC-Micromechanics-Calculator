@@ -3,9 +3,10 @@
 QAbstractTableModel backed by a pandas DataFrame.
 Avoids the overhead of populating QTableWidget items cell-by-cell.
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
@@ -16,16 +17,16 @@ from core.engine import AnalysisResult
 # PSH thresholds are ClassVar on AnalysisResult — safe to read at module
 # import time without constructing an instance.
 _PSH_STRENGTH_THRESHOLD: float = AnalysisResult.PSH_STRENGTH_THRESHOLD
-_PSH_ENERGY_THRESHOLD:   float = AnalysisResult.PSH_ENERGY_THRESHOLD
+_PSH_ENERGY_THRESHOLD: float = AnalysisResult.PSH_ENERGY_THRESHOLD
 
-_PASS_COLOR = QColor("#d4edda")   # soft green
-_FAIL_COLOR = QColor("#f8d7da")   # soft red
+_PASS_COLOR = QColor("#d4edda")  # soft green
+_FAIL_COLOR = QColor("#f8d7da")  # soft red
 
 # Column names that carry PSH traffic-light colouring.
 # 已经与 utils.io 中新的格式化表头对齐
 _PSH_COLUMNS: dict[str, float] = {
     "PSH Strength": _PSH_STRENGTH_THRESHOLD,
-    "PSH Energy":   _PSH_ENERGY_THRESHOLD,
+    "PSH Energy": _PSH_ENERGY_THRESHOLD,
 }
 
 
@@ -37,7 +38,7 @@ class ResultTableModel(QAbstractTableModel):
     based on the engineering thresholds to provide instant visual feedback.
     """
 
-    def __init__(self, parent: Optional[Any] = None) -> None:
+    def __init__(self, parent: Any | None = None) -> None:
         super().__init__(parent)
         self._df: pd.DataFrame = pd.DataFrame()
 
@@ -94,9 +95,7 @@ class ResultTableModel(QAbstractTableModel):
                     v = float(value)
                 except (TypeError, ValueError):
                     return None
-                return (
-                    _PASS_COLOR if v >= _PSH_COLUMNS[col_name] else _FAIL_COLOR
-                )
+                return _PASS_COLOR if v >= _PSH_COLUMNS[col_name] else _FAIL_COLOR
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
             return Qt.AlignmentFlag.AlignCenter

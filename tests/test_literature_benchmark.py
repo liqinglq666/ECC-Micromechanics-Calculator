@@ -18,9 +18,7 @@ from core.simulation import (
 def test_orientation_weights_match_yang_randomness_transform() -> None:
     theta = math.pi / 4.0
     assert _orientation_weight(theta, "3d") == pytest.approx(0.5)
-    assert _orientation_weight(theta, "2d") == pytest.approx(
-        math.sqrt(2.0) / math.pi
-    )
+    assert _orientation_weight(theta, "2d") == pytest.approx(math.sqrt(2.0) / math.pi)
 
 
 def test_pe_zero_chemical_bond_starts_from_zero_traction() -> None:
@@ -34,9 +32,7 @@ def test_pe_zero_chemical_bond_starts_from_zero_traction() -> None:
         f_snubbing=0.2,
         E_m=20.0,
     )
-    model = build_pullout_model(
-        FiberType.PE, common, pe_params=PEFiberParams(beta=0.0)
-    )
+    model = build_pullout_model(FiberType.PE, common, pe_params=PEFiberParams(beta=0.0))
     assert model.get_pullout_force(0.0, 6.0, 0.0) == pytest.approx(0.0)
 
 
@@ -107,10 +103,7 @@ def test_yang_2008_m45_one_way_pva_benchmark() -> None:
     )
 
     deltas = [0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.11]
-    stresses = [
-        simulate_sigma_at_delta(common, model, delta)
-        for delta in deltas
-    ]
+    stresses = [simulate_sigma_at_delta(common, model, delta) for delta in deltas]
     peak_index = max(range(len(stresses)), key=stresses.__getitem__)
     peak_stress = stresses[peak_index]
     peak_delta = deltas[peak_index]

@@ -3,13 +3,14 @@
 Unit conventions:
   length -> mm | force -> N | stress -> MPa | modulus -> GPa | energy -> J/m^2
 """
+
 from __future__ import annotations
 
 import hashlib
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 import numpy as np
 import pandas as pd
@@ -47,8 +48,8 @@ class SeriesParams:
     # mode: what the user currently selected in the UI.
     # source: where the currently loaded curve actually came from.
     sigma_delta_mode: str = "csv"  # "csv" | "simulation"
-    sigma_delta_path: Optional[Path] = field(default=None, repr=False)
-    sigma_delta_df: Optional[pd.DataFrame] = field(default=None, repr=False)
+    sigma_delta_path: Path | None = field(default=None, repr=False)
+    sigma_delta_df: pd.DataFrame | None = field(default=None, repr=False)
     sigma_delta_source: str = "none"  # "none" | "csv" | "simulation"
 
     # Theoretical simulation parameters
@@ -147,8 +148,10 @@ def _geometry_factor(alpha: float) -> float:
             f"alpha={alpha:.4f} is outside the supported range [0.1, 0.9] "
             "for the selected SENB geometry function."
         )
-    numerator = 3.0 * math.sqrt(alpha) * (
-        1.99 - alpha * (1.0 - alpha) * (2.15 - 3.93 * alpha + 2.7 * alpha**2)
+    numerator = (
+        3.0
+        * math.sqrt(alpha)
+        * (1.99 - alpha * (1.0 - alpha) * (2.15 - 3.93 * alpha + 2.7 * alpha**2))
     )
     denominator = 2.0 * (1.0 + 2.0 * alpha) * (1.0 - alpha) ** 1.5
     return numerator / denominator
@@ -213,8 +216,7 @@ def calc_jb_prime(delta: np.ndarray, sigma: np.ndarray) -> tuple[float, float, f
     """Return sigma0 [MPa], delta0 [mm], J_b' [J/m^2]."""
     if len(delta) != len(sigma):
         raise ValueError(
-            "delta and sigma arrays must have the same length; "
-            f"got {len(delta)} and {len(sigma)}."
+            f"delta and sigma arrays must have the same length; got {len(delta)} and {len(sigma)}."
         )
     if len(delta) < 2:
         raise ValueError("sigma-delta curve needs at least 2 data points.")

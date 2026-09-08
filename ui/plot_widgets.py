@@ -8,9 +8,8 @@ All charts follow a Google Research / Nature-journal aesthetic:
   - tight_layout() always applied
   - Right-click context menu for high-res publication export
 """
-from __future__ import annotations
 
-from typing import Optional
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -20,15 +19,22 @@ from matplotlib.figure import Figure
 
 # --- 新增的 PySide6 导入，用于右键菜单和文件保存对话框 ---
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMenu, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QFileDialog, QMenu, QMessageBox
 
 from core.engine import AnalysisResult, SeriesParams
 
 # Colorblind-safe high-contrast palette (Tableau-10 extended)
 _PALETTE = [
-    "#4C72B0", "#DD8452", "#55A868", "#C44E52",
-    "#8172B3", "#937860", "#DA8BC3", "#8C8C8C",
-    "#CCB974", "#64B5CD",
+    "#4C72B0",
+    "#DD8452",
+    "#55A868",
+    "#C44E52",
+    "#8172B3",
+    "#937860",
+    "#DA8BC3",
+    "#8C8C8C",
+    "#CCB974",
+    "#64B5CD",
 ]
 
 # secondary visual dimension for series beyond palette length
@@ -107,11 +113,12 @@ class _BaseCanvas(FigureCanvasQTAgg):
 # Tab 1 — Single series sigma-delta curve
 # ---------------------------------------------------------------------------
 
+
 class SingleSeriesCanvas(_BaseCanvas):
     def plot(
-            self,
-            result: AnalysisResult,
-            df: pd.DataFrame,
+        self,
+        result: AnalysisResult,
+        df: pd.DataFrame,
     ) -> None:
         self._clear()
         ax: Axes = self._fig.add_subplot(111)
@@ -132,7 +139,11 @@ class SingleSeriesCanvas(_BaseCanvas):
             label=f"Peak ($\\delta_0$={result.delta0:.3f}, $\\sigma_0$={result.sigma0:.2f})",
         )
 
-        _style_axes(ax, xlabel="Crack Opening Width $\\delta$ (mm)", ylabel="Bridging Stress $\\sigma$ (MPa)")
+        _style_axes(
+            ax,
+            xlabel="Crack Opening Width $\\delta$ (mm)",
+            ylabel="Bridging Stress $\\sigma$ (MPa)",
+        )
         ax.legend(frameon=False, fontsize=10)
         self._draw()
 
@@ -141,13 +152,14 @@ class SingleSeriesCanvas(_BaseCanvas):
 # Tab 3a — Interface properties dual-axis bar+line chart
 # ---------------------------------------------------------------------------
 
+
 class InterfaceComparisonCanvas(_BaseCanvas):
     def plot(
-            self,
-            results: list[AnalysisResult],
-            params_list: list[SeriesParams],
-            x_labels: list[str],
-            variable_name: str,
+        self,
+        results: list[AnalysisResult],
+        params_list: list[SeriesParams],
+        x_labels: list[str],
+        variable_name: str,
     ) -> None:
         self._clear()
         if not results:
@@ -198,13 +210,14 @@ class InterfaceComparisonCanvas(_BaseCanvas):
 # Tab 3b — Matrix properties dual-axis line chart
 # ---------------------------------------------------------------------------
 
+
 class MatrixComparisonCanvas(_BaseCanvas):
     def plot(
-            self,
-            results: list[AnalysisResult],
-            params_list: list[SeriesParams],
-            x_labels: list[str],
-            variable_name: str,
+        self,
+        results: list[AnalysisResult],
+        params_list: list[SeriesParams],
+        x_labels: list[str],
+        variable_name: str,
     ) -> None:
         self._clear()
         if not results:
@@ -219,13 +232,19 @@ class MatrixComparisonCanvas(_BaseCanvas):
         km_values = [r.km for r in results]
 
         ax1.plot(
-            x, em_values,
-            color=_PALETTE[2], marker="s", linewidth=1.8,
+            x,
+            em_values,
+            color=_PALETTE[2],
+            marker="s",
+            linewidth=1.8,
             label="$E_m$ (GPa)",
         )
         ax2.plot(
-            x, km_values,
-            color=_PALETTE[3], marker="^", linewidth=1.8,
+            x,
+            km_values,
+            color=_PALETTE[3],
+            marker="^",
+            linewidth=1.8,
             label="$K_m$ (MPa·m$^{0.5}$)",
         )
 
@@ -247,10 +266,11 @@ class MatrixComparisonCanvas(_BaseCanvas):
 # Tab 3c — Overlaid sigma-delta curves for all series
 # ---------------------------------------------------------------------------
 
+
 class OverlayCanvas(_BaseCanvas):
     def plot(
-            self,
-            series_data: list[tuple[str, pd.DataFrame, Optional[float], Optional[float]]],
+        self,
+        series_data: list[tuple[str, pd.DataFrame, float | None, float | None]],
     ) -> None:
         self._clear()
         if not series_data:

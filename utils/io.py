@@ -1,4 +1,5 @@
 """CSV ingestion and lightweight result export helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -56,9 +57,7 @@ def load_sigma_delta_csv(path: Path) -> pd.DataFrame:
     df = df.replace([np.inf, -np.inf], np.nan).dropna()
     df = df.loc[(df["delta"] >= 0.0) & (df["sigma"] >= 0.0)]
     df = (
-        df.sort_values("delta")
-        .drop_duplicates(subset="delta", keep="first")
-        .reset_index(drop=True)
+        df.sort_values("delta").drop_duplicates(subset="delta", keep="first").reset_index(drop=True)
     )
 
     if len(df) < 2:
@@ -89,11 +88,7 @@ def results_to_dataframe(results: list[AnalysisResult]) -> pd.DataFrame:
     """Convert analysis results into the compact table used by the GUI/CSV export."""
     rows = []
     for result in results:
-        sigma_fc = (
-            result.sigma0 / result.psh_strength
-            if result.psh_strength
-            else float("nan")
-        )
+        sigma_fc = result.sigma0 / result.psh_strength if result.psh_strength else float("nan")
         rows.append(
             {
                 "Series": result.series_name,

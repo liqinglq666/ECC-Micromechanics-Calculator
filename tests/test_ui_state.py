@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pandas as pd
 import pytest
-from PySide6.QtCore import Qt
 
 from core.engine import AnalysisResult
 from ui.main_window import MainWindow

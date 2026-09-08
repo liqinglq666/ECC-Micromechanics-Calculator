@@ -3,10 +3,11 @@
 The model is deliberately Qt-free.  Each series owns a stable UUID so
 background workers and UI selections never depend on mutable list indices.
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator, Optional
 from uuid import uuid4
 
 from core.engine import AnalysisResult, SeriesParams
@@ -21,7 +22,7 @@ class SeriesEntry:
     """One mix-design series with a stable identity and optional result."""
 
     params: SeriesParams
-    result: Optional[AnalysisResult] = None
+    result: AnalysisResult | None = None
     series_id: str = field(default_factory=_new_series_id)
 
 
@@ -39,9 +40,9 @@ class ProjectModel:
 
     def add_series(
         self,
-        params: Optional[SeriesParams] = None,
+        params: SeriesParams | None = None,
         *,
-        series_id: Optional[str] = None,
+        series_id: str | None = None,
     ) -> SeriesEntry:
         """Append and return a new series.
 
@@ -59,8 +60,7 @@ class ProjectModel:
         """Compatibility index-based removal used by existing callers/tests."""
         if not (0 <= index < len(self._entries)):
             raise IndexError(
-                f"Series index {index} is out of range "
-                f"(collection length = {len(self._entries)})."
+                f"Series index {index} is out of range (collection length = {len(self._entries)})."
             )
         self._entries.pop(index)
 
@@ -79,7 +79,7 @@ class ProjectModel:
             raise KeyError(f"Unknown series_id: {series_id}")
         return self._entries[index]
 
-    def find_entry(self, series_id: str) -> Optional[SeriesEntry]:
+    def find_entry(self, series_id: str) -> SeriesEntry | None:
         index = self.index_of(series_id)
         return self._entries[index] if index >= 0 else None
 

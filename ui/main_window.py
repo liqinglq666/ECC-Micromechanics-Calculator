@@ -5,11 +5,11 @@ The UI keeps the existing workflow while enforcing three invariants:
 2. Background results are routed by stable series UUID, never list index.
 3. Stale results/curves are invalidated as soon as their inputs change.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from PySide6.QtCore import Qt, Slot
@@ -36,8 +36,8 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStatusBar,
-    QTabWidget,
     QTableView,
+    QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -114,16 +114,16 @@ class MainWindow(QMainWindow):
         self.resize(1500, 860)
 
         self._model = ProjectModel()
-        self._current_series_id: Optional[str] = None
+        self._current_series_id: str | None = None
         self._loading_form = False
         self._analysis_busy = False
 
         self._csv_workers: dict[str, CsvLoaderWorker] = {}
         self._sim_workers: dict[str, SimulationWorker] = {}
         self._sim_ui_state: dict[str, _SimulationUiState] = {}
-        self._batch_worker: Optional[BatchAnalysisWorker] = None
+        self._batch_worker: BatchAnalysisWorker | None = None
         self._batch_errors: list[str] = []
-        self._export_worker: Optional[DataExportWorker] = None
+        self._export_worker: DataExportWorker | None = None
 
         self._build_ui()
         self._connect_signals()
@@ -230,9 +230,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._param_box)
 
         self._btn_run = QPushButton("▶  Run Analysis")
-        self._btn_run.setStyleSheet(
-            "background:#27ae60;color:white;font-weight:bold;padding:6px;"
-        )
+        self._btn_run.setStyleSheet("background:#27ae60;color:white;font-weight:bold;padding:6px;")
         layout.addWidget(self._btn_run)
         layout.addStretch()
         return panel
@@ -369,8 +367,14 @@ class MainWindow(QMainWindow):
         self._result_labels: dict[str, QLabel] = {}
         result_form = QFormLayout()
         for key in (
-            "tau0", "km", "j_tip", "sigma0", "delta0", "jb_prime",
-            "psh_strength", "psh_energy",
+            "tau0",
+            "km",
+            "j_tip",
+            "sigma0",
+            "delta0",
+            "jb_prime",
+            "psh_strength",
+            "psh_energy",
         ):
             label = QLabel("—")
             label.setStyleSheet("font-size:14px;")
@@ -494,18 +498,18 @@ class MainWindow(QMainWindow):
     # Series identity helpers
     # ------------------------------------------------------------------
 
-    def _item_series_id(self, item: Optional[QTreeWidgetItem]) -> Optional[str]:
+    def _item_series_id(self, item: QTreeWidgetItem | None) -> str | None:
         if item is None:
             return None
         value = item.data(0, _TREE_ID_ROLE)
         return str(value) if value else None
 
-    def _current_entry(self) -> Optional[SeriesEntry]:
+    def _current_entry(self) -> SeriesEntry | None:
         if self._current_series_id is None:
             return None
         return self._model.find_entry(self._current_series_id)
 
-    def _tree_item_for_id(self, series_id: str) -> Optional[QTreeWidgetItem]:
+    def _tree_item_for_id(self, series_id: str) -> QTreeWidgetItem | None:
         for index in range(self._tree.topLevelItemCount()):
             item = self._tree.topLevelItem(index)
             if self._item_series_id(item) == series_id:
@@ -572,9 +576,7 @@ class MainWindow(QMainWindow):
         params.sim_sigma_fu = self._sb_sigma_fu.value()
         params.sim_G_d = self._sb_G_d.value()
         params.sim_beta = (
-            self._sb_beta_pva.value()
-            if params.sim_fiber_type == "PVA"
-            else self._sb_beta.value()
+            self._sb_beta_pva.value() if params.sim_fiber_type == "PVA" else self._sb_beta.value()
         )
         params.sim_f_snubbing = self._sb_f_snubbing.value()
         params.sim_tau0_override = self._sb_tau0_override.value()
@@ -698,8 +700,8 @@ class MainWindow(QMainWindow):
     @Slot(object, object)
     def _on_tree_selection_changed(
         self,
-        current: Optional[QTreeWidgetItem],
-        _previous: Optional[QTreeWidgetItem],
+        current: QTreeWidgetItem | None,
+        _previous: QTreeWidgetItem | None,
     ) -> None:
         series_id = self._item_series_id(current)
         self._current_series_id = series_id
@@ -734,9 +736,9 @@ class MainWindow(QMainWindow):
         else:
             entry.result = None
         if new_mode == "simulation":
-            self._sim_ui_state.setdefault(entry.series_id, _SimulationUiState()).status = (
-                "Run simulation to generate the active σ–δ curve."
-            )
+            self._sim_ui_state.setdefault(
+                entry.series_id, _SimulationUiState()
+            ).status = "Run simulation to generate the active σ–δ curve."
         self._refresh_all_views()
         self._sync_simulation_ui()
 
@@ -777,9 +779,8 @@ class MainWindow(QMainWindow):
     @Slot(str, object, object)
     def _on_csv_loaded(self, series_id: str, df: pd.DataFrame, path: Path) -> None:
         entry = self._model.find_entry(series_id)
-        if entry is None:
+        if entry is None or entry.params.sigma_delta_mode != "csv":
             return
-        entry.params.sigma_delta_mode = "csv"
         entry.params.sigma_delta_df = df
         entry.params.sigma_delta_path = path
         entry.params.sigma_delta_source = "csv"
@@ -855,11 +856,16 @@ class MainWindow(QMainWindow):
     @Slot(str, object)
     def _on_sim_result(self, series_id: str, df: pd.DataFrame) -> None:
         entry = self._model.find_entry(series_id)
+        state = self._sim_ui_state.setdefault(series_id, _SimulationUiState())
         if entry is None:
+            return
+        if entry.params.sigma_delta_mode != "simulation":
+            state.status = "Simulation completed, but mode changed — result discarded."
+            if series_id == self._current_series_id:
+                self._sync_simulation_ui()
             return
         expected = entry.params.simulation_signature()
         actual = df.attrs.get("simulation_signature")
-        state = self._sim_ui_state.setdefault(series_id, _SimulationUiState())
         if actual != expected:
             state.status = "Parameters changed during simulation — result discarded."
             if series_id == self._current_series_id:
@@ -887,7 +893,9 @@ class MainWindow(QMainWindow):
 
     @Slot(str)
     def _on_sim_cancelled(self, series_id: str) -> None:
-        self._sim_ui_state.setdefault(series_id, _SimulationUiState()).status = "Simulation cancelled."
+        self._sim_ui_state.setdefault(
+            series_id, _SimulationUiState()
+        ).status = "Simulation cancelled."
         if series_id == self._current_series_id:
             self._sync_simulation_ui()
 
@@ -908,7 +916,10 @@ class MainWindow(QMainWindow):
         state = self._sim_ui_state.get(series_id, _SimulationUiState())
         entry = self._model.find_entry(series_id)
         if entry is not None and not state.status:
-            if entry.params.sigma_delta_source == "simulation" and entry.params.sigma_delta_df is not None:
+            if (
+                entry.params.sigma_delta_source == "simulation"
+                and entry.params.sigma_delta_df is not None
+            ):
                 state.status = f"✓ Simulated ({len(entry.params.sigma_delta_df)} points)"
         self._btn_run_sim.setEnabled(not running and not self._analysis_busy)
         self._sim_progress.setVisible(running)
@@ -1061,9 +1072,7 @@ class MainWindow(QMainWindow):
 
         worker = DataExportWorker(self._model, Path(path_str))
         self._export_worker = worker
-        worker.progress.connect(
-            lambda pct, msg: self._status_bar.showMessage(f"{msg} ({pct}%)")
-        )
+        worker.progress.connect(lambda pct, msg: self._status_bar.showMessage(f"{msg} ({pct}%)"))
         worker.succeeded.connect(
             lambda path: self._status_bar.showMessage(f"Exported project to: {path.name}")
         )

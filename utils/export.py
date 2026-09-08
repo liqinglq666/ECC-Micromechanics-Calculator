@@ -1,4 +1,5 @@
 """Multi-sheet Excel export for ECC Micromechanics Calculator."""
+
 from __future__ import annotations
 
 import logging
@@ -6,9 +7,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PySide6.QtCore import QThread, Signal
-
 from openpyxl.styles import Alignment, Font, PatternFill
+from PySide6.QtCore import QThread, Signal
 
 from core.engine import AnalysisResult
 from models.project import ProjectModel
@@ -62,11 +62,22 @@ def build_summary_df(model: ProjectModel) -> pd.DataFrame:
         )
 
     columns = [
-        "Series ID", "Series Name", "Variable Name", "Variable Value",
-        "tau0 (MPa)", "E_m (GPa)", "Fracture Condition", "Poisson Ratio",
-        "K_m (MPa*m^0.5)", "sigma_fc (MPa)", "J_tip (J/m^2)",
-        "sigma0 (MPa)", "delta0 (mm)", "J_b' (J/m^2)",
-        "PSH Strength", "PSH Energy",
+        "Series ID",
+        "Series Name",
+        "Variable Name",
+        "Variable Value",
+        "tau0 (MPa)",
+        "E_m (GPa)",
+        "Fracture Condition",
+        "Poisson Ratio",
+        "K_m (MPa*m^0.5)",
+        "sigma_fc (MPa)",
+        "J_tip (J/m^2)",
+        "sigma0 (MPa)",
+        "delta0 (mm)",
+        "J_b' (J/m^2)",
+        "PSH Strength",
+        "PSH Energy",
     ]
     return pd.DataFrame(rows, columns=columns)
 
@@ -129,11 +140,26 @@ def build_settings_log_df(model: ProjectModel) -> pd.DataFrame:
 
     return pd.DataFrame(
         columns=[
-            "Series ID", "Series Name", "Selected Bridging Mode", "Active Curve Source",
-            "CSV Path", "Curve Source Attr", "Simulation Signature", "Model Version",
-            "P_peak (N)", "d_f (mm)", "L_e (mm)", "P_max (N)", "Span S (mm)",
-            "Width b (mm)", "Depth d (mm)", "Notch a0 (mm)", "E_m (GPa)",
-            "Fracture Condition", "Poisson Ratio", "sigma_fc (MPa)",
+            "Series ID",
+            "Series Name",
+            "Selected Bridging Mode",
+            "Active Curve Source",
+            "CSV Path",
+            "Curve Source Attr",
+            "Simulation Signature",
+            "Model Version",
+            "P_peak (N)",
+            "d_f (mm)",
+            "L_e (mm)",
+            "P_max (N)",
+            "Span S (mm)",
+            "Width b (mm)",
+            "Depth d (mm)",
+            "Notch a0 (mm)",
+            "E_m (GPa)",
+            "Fracture Condition",
+            "Poisson Ratio",
+            "sigma_fc (MPa)",
             *[column for _, column in _SIM_PARAM_FIELDS],
         ]
     )

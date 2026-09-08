@@ -4,6 +4,7 @@ Workers communicate with the UI exclusively through stable series UUIDs.
 No worker relies on mutable list indices, and no custom signal shadows
 QThread.finished.
 """
+
 from __future__ import annotations
 
 import copy
@@ -126,9 +127,7 @@ class SimulationWorker(QThread):
             )
 
             pe_params = (
-                PEFiberParams(beta=self._params.sim_beta)
-                if fiber_type is FiberType.PE
-                else None
+                PEFiberParams(beta=self._params.sim_beta) if fiber_type is FiberType.PE else None
             )
             pva_params = (
                 PVAFiberParams(G_d=self._params.sim_G_d, beta=self._params.sim_beta)
