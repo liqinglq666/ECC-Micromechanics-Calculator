@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 20
 
     env:
-      QT_QPA_PLATFORM: xcb
+      QT_QPA_PLATFORM: offscreen
       QT_SCALE_FACTOR: "1"
       MPLBACKEND: QtAgg
       ECC_SCREENSHOT_DIR: copyright_screenshots
@@ -32,19 +32,12 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install Linux GUI runtime
+      - name: Install fonts and OpenGL runtime
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            xvfb \
             libegl1 \
             libgl1 \
-            libxkbcommon-x11-0 \
-            libxcb-cursor0 \
-            libxcb-xinerama0 \
-            libxcb-keysyms1 \
-            libxcb-image0 \
-            libxcb-render-util0 \
             fonts-dejavu-core \
             fonts-noto-cjk
 
@@ -59,8 +52,7 @@ jobs:
       - name: Launch real PySide6 UI and capture screenshots
         run: |
           mkdir -p copyright_screenshots
-          xvfb-run -a -s "-screen 0 1920x1080x24" \
-            python scripts/capture_copyright_screenshots.py
+          python scripts/capture_copyright_screenshots.py
 
       - name: Verify generated files
         run: |
