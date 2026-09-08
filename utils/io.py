@@ -18,7 +18,13 @@ _REQUIRED_COLUMNS: tuple[str, str] = ("delta", "sigma")
 
 
 def load_sigma_delta_csv(path: Path) -> pd.DataFrame:
-    """Read, clean, validate, and provenance-tag a sigma-delta CSV."""
+    """Read, strictly validate, and provenance-tag a sigma-delta CSV.
+
+    Scientific input is never silently repaired here. Invalid rows, duplicate
+    crack openings, or non-monotonic crack openings are rejected so the user
+    can correct the source data explicitly instead of analysing a modified
+    curve without noticing.
+    """
     if not path.exists():
         raise FileNotFoundError(f"File not found: {path}")
     if not path.is_file():
@@ -53,22 +59,46 @@ def load_sigma_delta_csv(path: Path) -> pd.DataFrame:
         )
 
     df = df.loc[:, ["delta", "sigma"]].copy()
-    df = df.apply(pd.to_numeric, errors="coerce")
-    df = df.replace([np.inf, -np.inf], np.nan).dropna()
-    df = df.loc[(df["delta"] >= 0.0) & (df["sigma"] >= 0.0)]
-    df = (
-        df.sort_values("delta").drop_duplicates(subset="delta", keep="first").reset_index(drop=True)
-    )
-
     if len(df) < 2:
+        raise DataLoadError(f"{path.name} must contain at least 2 data rows.")
+
+    numeric = df.apply(pd.to_numeric, errors="coerce")
+    if numeric.isna().any().any():
         raise DataLoadError(
-            f"After cleaning, {path.name} has fewer than 2 valid rows. "
-            "Check negative values, duplicates, or non-numeric entries."
+            f"{path.name} contains missing or non-numeric values in 'delta'/'sigma'. "
+            "Correct the source CSV instead of relying on automatic row removal."
         )
 
-    df.attrs["source"] = "csv"
-    df.attrs["csv_path"] = str(path.resolve())
-    return df
+    values = numeric.to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise DataLoadError(
+            f"{path.name} contains non-finite values (inf or -inf) in 'delta'/'sigma'."
+        )
+    if np.any(values < 0.0):
+        raise DataLoadError(
+            f"{path.name} contains negative delta or sigma values; both must be non-negative."
+        )
+
+    delta = numeric["delta"].to_numpy(dtype=float)
+    if numeric["delta"].duplicated().any():
+        duplicates = numeric.loc[numeric["delta"].duplicated(keep=False), "delta"].unique()
+        preview = ", ".join(f"{value:g}" for value in duplicates[:5])
+        suffix = "…" if len(duplicates) > 5 else ""
+        raise DataLoadError(
+            f"{path.name} contains duplicate delta values ({preview}{suffix}). "
+            "Each crack-opening value must appear exactly once."
+        )
+    if np.any(np.diff(delta) <= 0.0):
+        raise DataLoadError(
+            f"{path.name} delta values must be strictly increasing in file order. "
+            "Sort or correct the source CSV explicitly before import."
+        )
+
+    numeric = numeric.reset_index(drop=True)
+    numeric.attrs["source"] = "csv"
+    numeric.attrs["csv_path"] = str(path.resolve())
+    numeric.attrs["validation"] = "strict"
+    return numeric
 
 
 _RESULT_COLUMNS: list[str] = [
