@@ -7,7 +7,12 @@ on:
     paths:
       - ".github/workflows/copyright-screenshots.yml"
       - "scripts/capture_copyright_screenshots.py"
-      - "core/engine.py"
+      - "core/**"
+      - "models/**"
+      - "ui/**"
+      - "utils/**"
+      - "main.py"
+      - "pyproject.toml"
 
 permissions:
   contents: read
@@ -60,10 +65,12 @@ jobs:
           ls -lh copyright_screenshots
           test -f copyright_screenshots/01_startup_main_window.png
           test -f copyright_screenshots/02_pe_ecc_parameter_input.png
+          test -f copyright_screenshots/02b_theoretical_simulation_controls.png
           test -f copyright_screenshots/03_single_series_results.png
           test -f copyright_screenshots/04_data_summary.png
           test -f copyright_screenshots/05_comparative_analytics.png
           test -f copyright_screenshots/ECC_MC_real_run_results.xlsx
+          test -f copyright_screenshots/RUN_PROVENANCE.txt
 
       - name: Upload real UI screenshots
         uses: actions/upload-artifact@v4
