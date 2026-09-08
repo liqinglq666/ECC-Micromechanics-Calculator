@@ -19,8 +19,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-accel = ["numba>=0.59"]
-dev = ["pytest>=8", "ruff>=0.4", "mypy>=1.9", "pandas-stubs"]
+dev = [
+    "pytest>=8",
+    "pytest-qt>=4.4",
+    "ruff>=0.4",
+    "mypy>=1.9",
+    "pandas-stubs",
+]
 
 [project.scripts]
 ecc-calc = "main:main"
@@ -32,9 +37,6 @@ py-modules = ["main"]
 where = ["."]
 include = ["core*", "models*", "ui*", "utils*"]
 
-# ---------------------------------------------------------------------------
-# Ruff — linting + formatting
-# ---------------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
 target-version = "py310"
@@ -42,18 +44,15 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "N", "ANN"]
 ignore = [
-    "ANN101",  # self 不需要标注
-    "ANN102",  # cls 不需要标注
-    "ANN201",  # private 函数返回类型可省略
-    "ANN202",  # dunder 方法返回类型可省略
+    "ANN101",
+    "ANN102",
+    "ANN201",
+    "ANN202",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN"]
 
-# ---------------------------------------------------------------------------
-# Mypy
-# ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.10"
 strict = true
@@ -63,9 +62,6 @@ implicit_reexport = false
 module = ["scipy.*", "matplotlib.*"]
 ignore_missing_imports = true
 
-# ---------------------------------------------------------------------------
-# Pytest
-# ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts   = "-v --tb=short"
+addopts = "-v --tb=short"
