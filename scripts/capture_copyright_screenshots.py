@@ -12,7 +12,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTreeWidgetItem
+from PySide6.QtWidgets import QApplication, QScrollArea, QTreeWidgetItem
 
 from core.engine import SeriesParams, calc_tau0, run_full_analysis
 from core.simulation_safe import (
@@ -71,6 +71,20 @@ def _set_visible_form(window: MainWindow) -> None:
     window._sb_n_points.setValue(300)
     window._write_form_to_model(0)
     window._model.get_entry(0).params.sigma_delta_source = "simulation"
+
+
+def _capture_simulation_controls(app: QApplication, window: MainWindow) -> None:
+    """Scroll the real left parameter pane to expose the theoretical simulation controls."""
+    scroll_areas = window.findChildren(QScrollArea)
+    if not scroll_areas:
+        raise RuntimeError("No QScrollArea found in MainWindow")
+    left_scroll = scroll_areas[0]
+    bar = left_scroll.verticalScrollBar()
+    previous = bar.value()
+    bar.setValue(bar.maximum())
+    _capture(app, window, "02b_theoretical_simulation_controls.png")
+    bar.setValue(previous)
+    _settle(app, 300)
 
 
 def _build_and_run(
@@ -185,6 +199,7 @@ def main() -> int:
     window._on_add_series()
     _set_visible_form(window)
     _capture(app, window, "02_pe_ecc_parameter_input.png")
+    _capture_simulation_controls(app, window)
 
     _populate_real_results(window)
 
