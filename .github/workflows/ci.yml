@@ -40,5 +40,8 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q core models ui utils tests main.py
 
+      - name: Lint Python sources
+        run: ruff check core models ui utils tests main.py
+
       - name: Run test suite
         run: pytest -q
