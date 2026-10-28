@@ -200,11 +200,29 @@ $$
 
 其中 $P(\delta,l,\theta)$ 为单纤维拔出力。
 
+#### PE / PP debonding and sliding
+
+对于光滑、疏水型 PE/PP 纤维，模型近似忽略化学键能，依次计算界面脱粘和脱粘后的摩擦滑移。滑移阶段的单纤维拔出力为：
+
+$
+P_{\mathrm{slide}}(s)=\pi d_f\tau_0(L_e-s)\max\left(0,1+\beta\frac{s}{d_f}\right),\qquad s=\delta-\delta_d,\quad 0\le s<L_e
+$
+
+其中 $\delta_d$ 为完全脱粘时的开口位移，与桥接曲线峰值对应的 $\delta_0$ 不同。基体弹性模量已知时，完全脱粘位移的计算考虑纤维与基体的刚度比：
+
+$
+\eta=\frac{V_f E_f}{(1-V_f)E_m}
+$
+
+PE 的滑移硬化系数 $\beta$ 默认取 **0**；有单纤维拔出试验依据时再调整。
+
 #### 3-D isotropic random fibers
 
 $$
 w_{3D}(\theta)=\sin\theta\cos\theta
-$$
+$
+
+其中 $\sin\theta$ 表示三维随机取向的分布权重，$\cos\theta$ 计入倾斜纤维穿过裂缝面的概率。
 
 #### 2-D planar random fibers
 
@@ -377,6 +395,8 @@ numerics:
   quadrature_order: 64
 ```
 
+PVA 模型的定量标定宜分别使用脱粘后摩擦荷载 $P_b$、化学脱粘能 $G_d$ 和滑移硬化参数；端钩钢纤维则需要区分摩擦黏结与机械锚固贡献。未经独立标定时，两者更适合用于机制趋势分析。
+
 ---
 
 ## 7. Literature benchmark · Yang et al. (2008)
@@ -517,7 +537,6 @@ ECC-Micromechanics-Calculator/
 ├── tests/
 │   └── test_literature_benchmark.py
 ├── docs/
-│   ├── MICROMECHANICS_MODEL.md
 │   ├── LITERATURE_BENCHMARK.md
 │   └── ROADMAP_MICROMECHANICS.md
 ├── main.py
@@ -661,7 +680,6 @@ PSH_energy   = J_b_prime / J_tip
 
 ## 14. Documentation
 
-- [`Micromechanics Model Notes`](docs/MICROMECHANICS_MODEL.md) — 当前桥接模型、随机取向与断裂处理
 - [`Literature Benchmark`](docs/LITERATURE_BENCHMARK.md) — Yang et al. (2008) M45 文献基准
 - [`Micromechanics Roadmap`](docs/ROADMAP_MICROMECHANICS.md) — two-way pullout、spalling、Cook–Gordon 后续路线
 
