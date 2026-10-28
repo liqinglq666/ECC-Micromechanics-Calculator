@@ -454,19 +454,6 @@ xychart-beta
 | Cook–Gordon effect | 🔵 Roadmap | Not implemented yet |
 | Hooked steel | 🟡 Simplified | Calibration required |
 
-```mermaid
-flowchart LR
-    A[Experimental σ-δ<br/>Stable]:::stable --> B[Jb′ / PSH<br/>Stable]:::stable
-    C[PE one-way<br/>Mature]:::mature --> B
-    D[PVA one-way<br/>Benchmarked]:::bench --> B
-    E[PVA two-way<br/>Roadmap]:::future --> F[Spalling<br/>Roadmap]:::future --> G[Cook-Gordon<br/>Roadmap]:::future
-
-    classDef stable fill:#d9f7e8,stroke:#1f8f5f,stroke-width:1.5px;
-    classDef mature fill:#e5f0ff,stroke:#2d6cdf,stroke-width:1.5px;
-    classDef bench fill:#fff3cd,stroke:#c99700,stroke-width:1.5px;
-    classDef future fill:#f1f3f5,stroke:#868e96,stroke-dasharray: 5 5;
-```
-
 ---
 
 ## 9. Software architecture
@@ -670,46 +657,9 @@ PSH_energy   = J_b_prime / J_tip
 - 将某一组默认参数视为“所有 ECC 的材料常数”；
 - 在不满足几何前提时强行套用 SENB 几何函数。
 
-### Not claimed yet
-
-当前版本**不声称完整实现**：
-
-1. PVA two-way pullout；
-2. matrix micro-spalling；
-3. Cook–Gordon effect；
-4. 完整端钩钢纤维塑性锚固模型。
-
-这些内容已经进入 [`ROADMAP_MICROMECHANICS.md`](docs/ROADMAP_MICROMECHANICS.md)。
-
 ---
 
-## 14. Roadmap
-
-```mermaid
-gantt
-    title ECC Micromechanics Research Roadmap
-    dateFormat  YYYY-MM-DD
-    axisFormat  %Y-%m
-
-    section Core baseline
-    PE/PVA one-way correction       :done, a1, 2026-09-01, 7d
-    Yang 2008 literature benchmark  :done, a2, after a1, 5d
-
-    section Advanced PVA mechanics
-    Two-way pullout                 :active, b1, 2026-09-08, 14d
-    Matrix micro-spalling           :b2, after b1, 10d
-    Cook-Gordon effect              :b3, after b2, 10d
-
-    section Validation
-    Multi-literature benchmark set  :c1, after b1, 14d
-    Experimental calibration suite  :c2, after c1, 14d
-```
-
-> Roadmap represents development priorities rather than a promised release schedule.
-
----
-
-## 15. Documentation
+## 14. Documentation
 
 - [`Micromechanics Model Notes`](docs/MICROMECHANICS_MODEL.md) — 当前桥接模型、随机取向与断裂处理
 - [`Literature Benchmark`](docs/LITERATURE_BENCHMARK.md) — Yang et al. (2008) M45 文献基准
@@ -717,7 +667,7 @@ gantt
 
 ---
 
-## 16. References
+## 15. References
 
 1. **Kanda, T.; Li, V. C.** (2006). *Practical Design Criteria for Saturated Pseudo Strain Hardening Behavior in ECC*. Journal of Advanced Concrete Technology, 4(1), 59–72.
 2. **Yang, E.-H.; Wang, S.; Yang, Y.; Li, V. C.** (2008). *Fiber-Bridging Constitutive Law of Engineered Cementitious Composites*. Journal of Advanced Concrete Technology, 6(1), 181–193.
@@ -725,7 +675,7 @@ gantt
 
 ---
 
-## 17. Scope & license
+## 16. Scope & license
 
 This repository is currently distributed under a **Proprietary** license configuration as declared in `pyproject.toml`.
 
